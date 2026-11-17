@@ -1,0 +1,944 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>İngilizce Defteri</title>
+<meta name="description" content="Seviye testi, günlük 15 dakikalık plan, kelime kartları ve pratik.">
+<meta name="theme-color" content="#F5F2FA">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="İngilizce">
+<style>
+:root{
+  --bg:#F5F2FA; --surface:#FFFFFF; --raised:#FFFFFF; --ink:#1E1A24; --ink-2:#6C6577; --ink-3:#8F889A;
+  --line:#ECE6F4; --line-2:#D9D0E6; --accent:#8944D9; --accent-ink:#FFFFFF; --accent-soft:#F1E8FC;
+  --fill:rgba(124,92,168,.12); --fill-2:rgba(124,92,168,.07); --glass:rgba(250,247,253,.82);
+  --ok:#248A3D; --ok-soft:#E5F4E9; --warn:#B35A00; --warn-soft:#FDF0E1;
+  --shadow:0 1px 2px rgba(0,0,0,.04),0 4px 16px rgba(0,0,0,.06);
+  --r-card:16px; --r-ctl:10px;
+  --f:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI Variable Text","Segoe UI",system-ui,Roboto,"Helvetica Neue",Arial,sans-serif;
+  --f-d:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI Variable Display","Segoe UI",system-ui,Roboto,"Helvetica Neue",Arial,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0C0A10; --surface:#1C1922; --raised:#2A2632; --ink:#F6F3FA; --ink-2:#B3ABBF; --ink-3:#8F889A;
+  --line:#37323F; --line-2:#474151; --accent:#9B51E0; --accent-soft:#2C1F42;
+  --fill:rgba(150,120,190,.22); --fill-2:rgba(150,120,190,.13); --glass:rgba(28,25,34,.82);
+  --ok:#30D158; --ok-soft:#163220; --warn:#FF9F0A; --warn-soft:#3A2A10;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 6px 20px rgba(0,0,0,.35); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0C0A10; --surface:#1C1922; --raised:#2A2632; --ink:#F6F3FA; --ink-2:#B3ABBF; --ink-3:#8F889A;
+  --line:#37323F; --line-2:#474151; --accent:#9B51E0; --accent-soft:#2C1F42;
+  --fill:rgba(150,120,190,.22); --fill-2:rgba(150,120,190,.13); --glass:rgba(28,25,34,.82);
+  --ok:#30D158; --ok-soft:#163220; --warn:#FF9F0A; --warn-soft:#3A2A10;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 6px 20px rgba(0,0,0,.35); color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.5 var(--f);-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
+button,input,textarea,select{font:inherit;color:inherit}
+a{color:var(--accent)}
+.app{max-width:720px;margin:0 auto;padding:max(20px,env(safe-area-inset-top)) 16px calc(96px + env(safe-area-inset-bottom,0px))}
+h1{font:700 32px/1.15 var(--f-d);letter-spacing:-.01em;margin:8px 0 4px}
+h2{font:700 21px/1.25 var(--f-d);margin:28px 0 10px}
+h3{font:600 17px/1.3 var(--f-d);margin:0 0 6px}
+.sub{color:var(--ink-2);margin:0 0 18px}
+.muted{color:var(--ink-2)} .small{font-size:13.5px} .tiny{font-size:12px;color:var(--ink-3)}
+.card{background:var(--surface);border-radius:var(--r-card);box-shadow:var(--shadow);padding:16px 18px;margin:0 0 12px}
+.card.soft{background:var(--accent-soft);box-shadow:none}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.between{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.stack>*+*{margin-top:10px}
+.btn{border:0;border-radius:var(--r-ctl);padding:10px 16px;background:var(--fill);color:var(--accent);font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;text-decoration:none;line-height:1.2;min-height:40px;white-space:nowrap}
+.btn:hover{filter:brightness(.97)}
+.btn.primary{background:var(--accent);color:var(--accent-ink)}
+.btn.ghost{background:transparent;padding-left:8px;padding-right:8px}
+.btn.block{width:100%;justify-content:center;min-height:48px;font-size:17px}
+.btn:disabled{opacity:.45;cursor:default}
+.chip{border:0;border-radius:999px;padding:6px 12px;background:var(--fill-2);color:var(--ink-2);font-size:13.5px;cursor:pointer}
+.chip[aria-pressed=true]{background:var(--accent);color:#fff}
+.tag{display:inline-block;border-radius:6px;padding:1px 7px;font-size:12px;font-weight:600;background:var(--fill-2);color:var(--ink-2)}
+.tag.acc{background:var(--accent-soft);color:var(--accent)}
+.tag.ok{background:var(--ok-soft);color:var(--ok)}
+.seg{display:flex;background:var(--fill-2);border-radius:10px;padding:3px;margin:0 0 16px}
+.seg button{flex:1;border:0;background:transparent;border-radius:8px;padding:8px 6px;font-weight:600;color:var(--ink-2);cursor:pointer;font-size:14.5px}
+.seg button[aria-selected=true]{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+textarea,input.f{width:100%;border:0;background:var(--fill-2);border-radius:var(--r-ctl);padding:11px 13px;font-size:16px;resize:vertical}
+textarea:focus,input.f:focus{outline:0;box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 35%,transparent);background:var(--surface)}
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:50;background:var(--glass);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-top:1px solid var(--line);padding:6px 8px max(8px,env(safe-area-inset-bottom))}
+.tabbar nav{max-width:560px;margin:0 auto;display:flex}
+.tabbar a{flex:1;text-decoration:none;color:var(--ink-3);display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;font-weight:600;padding:4px 0}
+.tabbar a svg{width:24px;height:24px}
+.tabbar a[aria-current=page]{color:var(--accent)}
+/* levels */
+.lvl{display:grid;grid-template-columns:84px 1fr 54px;gap:10px;align-items:center;padding:7px 0}
+.lvl+.lvl{border-top:1px solid var(--line)}
+.lvl .bars{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
+.lvl .bars i{height:10px;border-radius:5px;background:var(--fill)}
+.lvl .bars i.on{background:var(--accent)}
+.lvl .bars i.work{background:repeating-linear-gradient(45deg,var(--accent) 0 3px,transparent 3px 6px);opacity:.55}
+.lvl b{font:600 15px var(--f-d);text-align:right}
+/* test */
+.progress{height:6px;background:var(--fill);border-radius:3px;overflow:hidden;margin:6px 0 18px}
+.progress i{display:block;height:100%;background:var(--accent);transition:width .3s}
+.opts{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.opt{border:0;text-align:left;background:var(--surface);box-shadow:var(--shadow);border-radius:12px;padding:13px 16px;cursor:pointer;font-size:16px}
+.opt:hover{box-shadow:0 0 0 2px var(--accent)}
+.opt.idk{background:transparent;box-shadow:none;color:var(--ink-2);text-align:center}
+.qword{font:700 30px/1.2 var(--f-d);margin:6px 0}
+.passage{background:var(--surface);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow);font-size:15.5px;line-height:1.6;margin-bottom:10px}
+.check{display:flex;gap:12px;align-items:flex-start;padding:11px 0;cursor:pointer}
+.check+.check{border-top:1px solid var(--line)}
+.check input{width:22px;height:22px;accent-color:var(--accent);flex:none;margin-top:1px}
+/* today */
+.week{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;text-align:center}
+.week div{font-size:11px;color:var(--ink-3);font-weight:600}
+.week span{display:block;margin:4px auto 0;width:30px;height:30px;border-radius:50%;background:var(--fill-2);line-height:30px;font-size:13px;color:var(--ink-2)}
+.week span.done{background:var(--accent);color:#fff}
+.week span.today{box-shadow:0 0 0 2px var(--accent)}
+.task{display:flex;gap:14px;align-items:flex-start}
+.task .tick{flex:none;width:28px;height:28px;border-radius:50%;border:2px solid var(--line-2);background:transparent;cursor:pointer;display:grid;place-items:center;color:#fff;margin-top:2px}
+.task .tick.on{background:var(--accent);border-color:var(--accent)}
+.task .body{flex:1;min-width:0}
+.task ol{margin:8px 0 10px;padding-left:20px}
+.task ol li{margin:3px 0}
+/* cards */
+.flash{background:var(--surface);border-radius:20px;box-shadow:var(--shadow);padding:34px 20px;text-align:center;min-height:240px;display:flex;flex-direction:column;justify-content:center;gap:10px}
+.flash .w{font:700 34px/1.15 var(--f-d)}
+.flash .ex{color:var(--ink-2);font-style:italic}
+.flash .tr{font:600 22px var(--f-d);color:var(--accent)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stat{background:var(--surface);border-radius:14px;box-shadow:var(--shadow);padding:12px 14px}
+.stat b{display:block;font:700 24px var(--f-d)}
+.stat span{font-size:12.5px;color:var(--ink-2)}
+/* practice */
+.diff span{padding:1px 2px;border-radius:4px}
+.diff .miss{background:var(--warn-soft);color:var(--warn);text-decoration:underline wavy}
+.diff .hit{color:var(--ok)}
+.rec{width:72px;height:72px;border-radius:50%;border:0;background:var(--accent);color:#fff;cursor:pointer;display:grid;place-items:center;margin:8px auto}
+.rec.live{animation:pulse 1.2s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 50%,transparent)}100%{box-shadow:0 0 0 18px transparent}}
+.entry{border-top:1px solid var(--line);padding:10px 0}
+.entry pre{white-space:pre-wrap;font:inherit;margin:6px 0 0;font-size:14.5px}
+/* resources */
+.res{display:flex;gap:12px;align-items:flex-start}
+.res .ico{flex:none;width:38px;height:38px;border-radius:10px;background:var(--accent-soft);display:grid;place-items:center;font-size:19px}
+.res p{margin:3px 0 0;font-size:14px;color:var(--ink-2)}
+/* modal */
+.ov{position:fixed;inset:0;z-index:90;background:rgba(0,0,0,.32);display:flex;align-items:flex-end;justify-content:center;padding:12px}
+@media (min-width:700px){.ov{align-items:center}}
+.modal{background:var(--surface);border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,.25);width:min(560px,100%);max-height:calc(100dvh - 24px);overflow:auto;padding:18px 20px}
+.modal ol{padding-left:20px;margin:10px 0}
+.modal ol li{margin:0 0 14px}
+.modal textarea.q{font:12.5px/1.45 ui-monospace,"SF Mono",Menlo,Consolas,monospace;min-height:120px;margin-top:8px}
+.toast{position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:14px;z-index:99;box-shadow:var(--shadow)}
+.why{display:grid;gap:10px;margin:18px 0}
+.why .card{display:flex;gap:14px;align-items:flex-start;margin:0}
+.why .n{flex:none;font-size:24px}
+hr{border:0;border-top:1px solid var(--line);margin:16px 0}
+@media (max-width:420px){h1{font-size:28px}.lvl{grid-template-columns:72px 1fr 46px}}
+</style>
+</head>
+<body>
+<div class="app" id="main"></div>
+<div class="tabbar" id="tabbar"></div>
+<script>
+"use strict";
+/* ================= DATA ================= */
+const LV = ["A1","A2","B1","B2","C1"];
+const SK = {vocab:"Kelime", grammar:"Gramer", reading:"Okuma", listening:"Dinleme", writing:"Yazma", speaking:"Konuşma"};
+
+// [level, word, options, correctIndex]
+const T_VOCAB = [
+ [0,"apple",["armut","elma","ekmek","anahtar"],1],[0,"kitchen",["mutfak","bahçe","oda","kapı"],0],
+ [0,"tired",["mutlu","aç","yorgun","hasta"],2],[0,"buy",["satmak","satın almak","taşımak","beklemek"],1],
+ [1,"borrow",["ödünç almak","ödünç vermek","kaybetmek","saklamak"],0],[1,"journey",["gazete","yolculuk","toplantı","günlük"],1],
+ [1,"careful",["dikkatsiz","sakin","dikkatli","bakımlı"],2],[1,"improve",["kanıtlamak","geliştirmek","korumak","ithal etmek"],1],
+ [2,"avoid",["kaçınmak","onaylamak","ulaşmak","karar vermek"],0],[2,"reliable",["esnek","pahalı","güvenilir","kırılgan"],2],
+ [2,"purpose",["sonuç","amaç","teklif","süreç"],1],[2,"achieve",["başarmak","kabul etmek","vazgeçmek","tahmin etmek"],0],
+ [3,"feasible",["uygulanabilir","görünür","esnek","makul fiyatlı"],0],[3,"cumbersome",["kullanışlı","hantal","kırılgan","şık"],1],
+ [3,"undermine",["desteklemek","altını çizmek","baltalamak","yeraltına inmek"],2],[3,"thorough",["yüzeysel","kapsamlı ve titiz","içinden geçen","hızlı"],1],
+ [4,"meticulous",["dağınık","son derece titiz","ürkek","metalik"],1],[4,"ubiquitous",["eşsiz","her yerde bulunan","belirsiz","yasadışı"],1],
+ [4,"mitigate",["hafifletmek","göç etmek","kışkırtmak","taklit etmek"],0],[4,"conspicuous",["şüpheli","bilinçli","göze çarpan","tutarlı"],2]
+];
+const T_GRAM = [
+ [0,"She ___ a student.",["am","is","are","be"],1],[0,"I ___ coffee every morning.",["drinks","drinking","drink","am drink"],2],
+ [0,"There ___ two chairs in the room.",["is","are","be","has"],1],[0,"___ you like pizza?",["Are","Does","Do","Is"],2],
+ [1,"I ___ to İzmir last summer.",["go","went","have gone","was go"],1],[1,"My sister is ___ than me.",["tall","more tall","taller","tallest"],2],
+ [1,"I've lived here ___ 2019.",["for","since","from","ago"],1],[1,"We ___ dinner when the phone rang.",["were having","had","have","are having"],0],
+ [2,"If it rains tomorrow, we ___ at home.",["stay","would stay","will stay","stayed"],2],[2,"This bridge ___ in 1973.",["built","was built","has built","is building"],1],
+ [2,"I'm used to ___ up early.",["get","got","getting","have got"],2],[2,"She asked me where I ___.",["live","lived","do live","am living"],1],
+ [3,"If I ___ about the problem, I would have helped you.",["knew","had known","have known","would know"],1],[3,"By next June, she ___ her degree.",["will finish","finishes","will have finished","has finished"],2],
+ [3,"I'd rather you ___ smoke in the studio.",["don't","didn't","won't","not"],1],[3,"Not only ___ late, but he also forgot the model.",["he was","was he","he is","did he"],1],
+ [4,"Hardly ___ arrived when it started to rain.",["we had","had we","we have","did we"],1],[4,"It's high time we ___ a decision.",["make","made","will make","are making"],1],
+ [4,"Little ___ that the prototype would win an award.",["they knew","did they know","they did know","knew they"],1],[4,"Were it not for your help, I ___ in serious trouble now.",["will be","would be","would have been","am"],1]
+];
+const T_READ = [
+ {lv:0,text:"Hi, I'm Ece. I am a student. I study design at university. I get up at seven every day. I drink tea and I walk to school. I like drawing chairs and lamps.",
+  qs:[["Ece ne okuyor?",["Mimarlık","Tasarım","Resim","Mühendislik"],1],["Okula nasıl gidiyor?",["Otobüsle","Bisikletle","Yürüyerek","Arabayla"],2]]},
+ {lv:1,text:"Last weekend Mert visited a small furniture museum in his city. He didn't want to go at first because it was raining, but his friend Selin convinced him. In the museum, he saw chairs from the 1950s. His favourite was a simple wooden chair with three legs. After the visit, they had lunch in a café near the museum.",
+  qs:[["Mert neden başta gitmek istemedi?",["Yorgundu","Yağmur yağıyordu","Müze kapalıydı","Selin gelmiyordu"],1],["En çok hangi parçayı sevdi?",["Metal bir masa","1950'lerden bir lamba","Üç bacaklı ahşap bir sandalye","Plastik bir koltuk"],2]]},
+ {lv:2,text:"Many students think that a good designer must be good at drawing. Drawing helps, of course, but it is not the most important skill. Good designers spend a lot of time observing how people actually use things. They notice small problems — a handle that is hard to hold, a button that is easy to press by mistake — and they ask why. Sketching is simply a way of thinking about these problems quickly.",
+  qs:[["Metne göre en önemli beceri hangisi?",["İyi çizim yapmak","İnsanların nesneleri nasıl kullandığını gözlemlemek","Hızlı çalışmak","Bilgisayar programlarını bilmek"],1],["Metne göre eskiz nedir?",["Sunum için güzel bir görsel","Problemler üzerine hızlıca düşünmenin bir yolu","Zaman kaybı","Sadece yeteneklilerin işi"],1]]},
+ {lv:3,text:"Although sustainable materials are often presented as the solution to the environmental impact of products, the reality is more nuanced. A bamboo toothbrush shipped across the world may have a larger carbon footprint than a plastic one produced locally. Designers are therefore increasingly encouraged to consider a product's entire life cycle — from extraction and manufacturing to use and disposal — rather than focusing on a single 'green' feature.",
+  qs:[["Bambu diş fırçası örneği neyi gösteriyor?",["Bambunun her zaman en iyi malzeme olduğunu","Malzeme tek başına sürdürülebilirliği garanti etmez","Plastiğin yasaklanması gerektiğini","Yerel üretimin pahalı olduğunu"],1],["Tasarımcılardan ne yapmaları isteniyor?",["Sadece geri dönüştürülebilir malzeme kullanmaları","Ürünün tüm yaşam döngüsünü düşünmeleri","Daha ucuz ürünler yapmaları","Taşımacılığı tamamen bırakmaları"],1]]},
+ {lv:4,text:"The notion that form should follow function, long treated as an unassailable maxim, has come under scrutiny from those who argue that function itself is far from self-evident. What a product is 'for' is shaped by cultural expectations, emotional attachments and the rituals that surround its use; a teapot, after all, does rather more than dispense tea. Critics contend that, by reducing function to mere utility, the maxim inadvertently licenses an impoverished understanding of what people value in objects.",
+  qs:[["Eleştirmenlere göre asıl sorun ne?",["Biçimin işlevden daha önemli olması","'İşlev' kavramının sanıldığı kadar açık olmaması ve sadece faydaya indirgenmesi","Çaydanlıkların kötü tasarlanması","İlkenin çok yeni olması"],1],["Çaydanlık örneği neyi anlatıyor?",["Çaydanlıkların pahalı olduğunu","Nesnelerin kültürel ve duygusal anlamları da olduğunu","Çay kültürünün kaybolduğunu","Biçimin önemsiz olduğunu"],1]]}
+];
+// [level, sentence, question, options, correct]
+const T_LIST = [
+ [0,"I have a sister and a brother.","Konuşmacının kaç kardeşi var?",["Bir","İki","Üç","Hiç yok"],1],
+ [0,"The coffee is three euros, please.","Kahve kaç euro?",["İki","Üç","Dört","On üç"],1],
+ [1,"The shop opens at nine, but on Sundays it closes at two.","Pazar günleri dükkân ne zaman kapanıyor?",["09:00","12:00","14:00","21:00"],2],
+ [1,"I missed the bus, so I took a taxi to work.","Ne oldu?",["Otobüse yetişti","Otobüsü kaçırıp taksiye bindi","İşe yürüdü","İşe gitmedi"],1],
+ [2,"I would have come to the meeting, but my train was cancelled.","Konuşmacı toplantıya geldi mi?",["Evet, trenle geldi","Hayır, treni iptal edildi","Evet ama geç kaldı","Toplantı iptal edildi"],1],
+ [2,"If you finish the sketches by Friday, we can show them to the client on Monday.","Eskizler müşteriye ne zaman gösterilebilir?",["Cuma","Cumartesi","Pazartesi","Belli değil"],2],
+ [3,"Despite the tight budget, the team managed to deliver the prototype ahead of schedule.","Ekip prototipi ne zaman teslim etti?",["Geç","Planlanandan önce","Tam zamanında","Teslim edemedi"],1],
+ [3,"She's been meaning to apply for the internship, but she keeps putting it off.","Durum ne?",["Staja başvurdu ve kabul edildi","Başvurmayı sürekli erteliyor","Stajı bıraktı","Başvurmak istemiyor"],1],
+ [4,"Had the client raised their concerns earlier, we could have spared ourselves weeks of revisions.","Ne anlatılıyor?",["Müşteri endişelerini erken söyledi","Müşteri endişelerini geç söylediği için haftalarca revizyon yapıldı","Revizyon gerekmedi","Müşteri projeyi iptal etti"],1],
+ [4,"It's not so much the price that bothers me as the fact that nobody consulted us.","Konuşmacıyı asıl rahatsız eden ne?",["Fiyat","Kimsenin onlara danışmamış olması","Ürünün kalitesi","Teslim süresi"],1]
+];
+const T_SELF = {
+ writing:[
+  ["Kendimi birkaç basit cümleyle tanıtabilirim (ad, okul, sevdiklerim).","Basit bir formu doldurabilirim."],
+  ["Günlük işlerimi ve geçen hafta sonumu kısa cümlelerle yazabilirim.","Kısa, basit bir mesaj ya da teşekkür notu yazabilirim."],
+  ["Bir deneyimimi ya da projemi bağlantılı bir paragrafla anlatabilirim.","Bilgi istemek için basit bir e-posta yazabilirim."],
+  ["Bir konuda fikrimi gerekçeleriyle savunan bir yazı yazabilirim.","Resmi bir e-posta ya da portfolyo açıklaması yazabilirim."],
+  ["Karmaşık bir konuyu düzenli, akıcı ve doğru tonla yazabilirim.","Yazarken kelime bulmakta neredeyse hiç zorlanmam."]],
+ speaking:[
+  ["Selamlaşıp kendimi tanıtabilirim.","Yavaş konuşulursa basit sorulara cevap verebilirim."],
+  ["Kafede sipariş vermek, yol sormak gibi basit işleri halledebilirim.","Ailemi, okulumu, günümü kısaca anlatabilirim."],
+  ["Seyahatte karşılaşacağım çoğu durumu idare edebilirim.","Bir filmi ya da projemi anlatıp kısaca fikrimi söyleyebilirim."],
+  ["Ana dili İngilizce olan biriyle fazla zorlanmadan sohbet edebilirim.","Bir projemi sunup sorulara cevap verebilirim."],
+  ["Kelime aramadan akıcı ve doğal konuşabilirim.","Bir toplantı ya da tartışmada fikrimi incelikli şekilde ifade edebilirim."]]
+};
+
+// [en, tr, example, level, topic]
+const WORDS = [
+ ["morning","sabah","I study best in the morning.",0,"günlük"],["cheap","ucuz","This chair is cheap but nice.",0,"günlük"],
+ ["expensive","pahalı","The lamp is too expensive.",0,"günlük"],["ticket","bilet","Two tickets to Ankara, please.",0,"seyahat"],
+ ["left / right","sol / sağ","Turn left at the bank.",0,"seyahat"],["friend","arkadaş","My friend is a designer too.",0,"günlük"],
+ ["draw","çizmek","I draw every day.",0,"tasarım"],["colour","renk","What colour is your bag?",0,"tasarım"],
+ ["shape","şekil","The table has a round shape.",0,"tasarım"],["work","çalışmak; iş","I work in a café on weekends.",0,"iş"],
+ ["hungry","aç","I'm hungry. Let's eat.",0,"günlük"],["weather","hava (durumu)","The weather is nice today.",0,"günlük"],
+ ["wait","beklemek","Please wait here.",0,"günlük"],["easy / difficult","kolay / zor","This exercise is easy.",0,"günlük"],
+ ["borrow","ödünç almak","Can I borrow your pencil?",1,"günlük"],["journey","yolculuk","The journey took six hours.",1,"seyahat"],
+ ["luggage","bagaj, valiz","My luggage is too heavy.",1,"seyahat"],["booking","rezervasyon","I have a booking for two nights.",1,"seyahat"],
+ ["material","malzeme","Wood is my favourite material.",1,"tasarım"],["sketch","eskiz; eskiz yapmak","I made ten sketches yesterday.",1,"tasarım"],
+ ["improve","geliştirmek","I want to improve my English.",1,"günlük"],["careful","dikkatli","Be careful, the glass is hot.",1,"günlük"],
+ ["deadline","teslim tarihi","The deadline is next Friday.",1,"iş"],["meeting","toplantı","We have a meeting at ten.",1,"iş"],
+ ["comfortable","rahat","This chair is very comfortable.",1,"tasarım"],["decide","karar vermek","I can't decide which colour to use.",1,"günlük"],
+ ["almost","neredeyse","I'm almost finished.",1,"günlük"],["reason","sebep","What's the reason for this shape?",1,"günlük"],
+ ["schedule","program, takvim","My schedule is full this week.",1,"iş"],
+ ["avoid","kaçınmak","Try to avoid sharp edges.",2,"tasarım"],["reliable","güvenilir","We need a reliable supplier.",2,"iş"],
+ ["purpose","amaç","What's the purpose of this button?",2,"tasarım"],["achieve","başarmak","She achieved her goal.",2,"günlük"],
+ ["feedback","geri bildirim","Thanks for the feedback.",2,"iş"],["prototype","prototip","We tested the prototype with users.",2,"tasarım"],
+ ["user","kullanıcı","The user can't find the switch.",2,"tasarım"],["solve","çözmek","This design solves a real problem.",2,"tasarım"],
+ ["apply for","-e başvurmak","I'm applying for an internship.",2,"iş"],["experience","deneyim","Do you have any work experience?",2,"iş"],
+ ["handle","sap, kulp; başa çıkmak","The handle is too small.",2,"tasarım"],["suggest","önermek","I suggest a lighter material.",2,"iş"],
+ ["although","-e rağmen, gerçi","Although it's cheap, it looks good.",2,"günlük"],["get used to","-e alışmak","I'm getting used to the new software.",2,"günlük"],
+ ["recently","son zamanlarda","I've recently started 3D modelling.",2,"günlük"],["research","araştırma","We did some user research first.",2,"tasarım"],
+ ["feasible","uygulanabilir","Is this idea feasible to produce?",3,"tasarım"],["cumbersome","hantal","The old version was cumbersome.",3,"tasarım"],
+ ["durable","dayanıklı","Steel is more durable than plastic.",3,"tasarım"],["sustainable","sürdürülebilir","We chose a sustainable material.",3,"tasarım"],
+ ["ergonomic","ergonomik","The grip is ergonomic.",3,"tasarım"],["iterate","geliştirerek tekrarlamak","We iterated on the design five times.",3,"tasarım"],
+ ["thorough","kapsamlı, titiz","She did a thorough analysis.",3,"iş"],["outcome","sonuç","The outcome was better than expected.",3,"iş"],
+ ["constraint","kısıt","Budget was our main constraint.",3,"tasarım"],["stakeholder","paydaş","We presented it to the stakeholders.",3,"iş"],
+ ["put off","ertelemek","Stop putting off your portfolio!",3,"günlük"],["take into account","hesaba katmak","Take the user's age into account.",3,"tasarım"],
+ ["whereas","oysa, -iken","Wood feels warm, whereas metal feels cold.",3,"günlük"],["insight","içgörü","The interviews gave us useful insights.",3,"tasarım"],
+ ["lead time","teslim süresi","The lead time for the moulds is six weeks.",3,"iş"],
+ ["meticulous","son derece titiz","He is meticulous about details.",4,"tasarım"],["ubiquitous","her yerde bulunan","Smartphones are ubiquitous.",4,"günlük"],
+ ["mitigate","hafifletmek","How can we mitigate the risk?",4,"iş"],["conspicuous","göze çarpan","The logo is too conspicuous.",4,"tasarım"],
+ ["nuanced","incelikli","Her argument was nuanced.",4,"günlük"],["streamline","sadeleştirmek","We streamlined the assembly process.",4,"iş"],
+ ["tactile","dokunsal","The surface has a pleasant tactile quality.",4,"tasarım"],["inadvertently","istemeden","The update inadvertently removed a feature.",4,"günlük"],
+ ["scrutiny","yakın inceleme","The proposal came under scrutiny.",4,"iş"],["leverage","avantaja çevirmek","We can leverage existing parts.",4,"iş"]
+];
+
+const GRAMMAR = [
+ ["to be (am / is / are)","Present Simple (geniş zaman)","There is / There are","a / an / the","Çoğullar ve this/that/these/those","can / can't","İyelik (my, your, 's)","Soru kelimeleri (what, where, when...)"],
+ ["Past Simple (di'li geçmiş)","Present Continuous (şimdiki zaman)","Comparatives & Superlatives","going to / will","Present Perfect'e giriş","Countable / Uncountable (some, any, much, many)","Zaman ve yer edatları (in / on / at)","Sıklık zarfları (always, usually...)"],
+ ["Present Perfect vs Past Simple","Past Continuous","First & Second Conditional","Passive (present / past)","used to / be used to","Reported Speech (dolaylı anlatım)","Relative Clauses (who, which, that)","must / have to / should"],
+ ["Third & Mixed Conditionals","Future Perfect & Future Continuous","İleri seviye Passive","wish / if only","Tahmin modalları (must have, might have)","Gerund vs Infinitive","Bağlaçlar (although, whereas, however...)","Inversion'a giriş"],
+ ["Inversion (Hardly had..., Little did...)","Cleft sentences (What I need is...)","Participle clauses","Subjunctive & It's time...","Ellipsis & substitution","İleri seviye bağlaçlar ve ton","Collocations ve doğal ifade","Hedging (akademik temkinli dil)"]
+];
+
+const SENT = [
+ ["I am a design student.","I live in a small flat.","Can I have a coffee, please?","Where is the train station?","I like drawing and music.","See you tomorrow!"],
+ ["I went to a museum last weekend.","Could you say that again, please?","I'm looking for a cheap hotel near the centre.","My favourite object is an old lamp.","I usually work in the studio in the afternoon.","How long does it take to get there?"],
+ ["I've been working on this project for three weeks.","If I had more time, I would make a better prototype.","The main problem was that the handle was too small.","Would you mind if I asked you a few questions?","I'm not sure, but I think it might be cheaper.","Let me show you my first sketches."],
+ ["The design was simplified to reduce production costs.","Had I known about the deadline, I would have started earlier.","What I'm trying to say is that users don't read instructions.","It's worth considering the whole life cycle of the product.","I'd like to walk you through the main features.","Could you elaborate on what you mean by that?"],
+ ["Not only does it look better, but it's also easier to repair.","The feedback, while harsh, turned out to be invaluable.","I'd argue that the brief itself was flawed from the outset.","Rarely do we get the chance to test ideas with real users.","It's less about aesthetics and more about how it feels to use.","Were we to start again, I'd prioritise research over styling."]
+];
+
+const W_PROMPTS = {
+ low:["Kendini tanıt: adın, okulun, neyi tasarlamayı seversin? (3–5 cümle)","Dün ne yaptın? (5 cümle, past simple dene)","En sevdiğin nesne ne ve neden? (5 cümle)","Bu hafta sonu planın ne? (going to kullan)","Odanı anlat (There is / There are kullan)","Bir kafede sipariş verdiğin kısa bir diyalog yaz","En sevdiğin şehir neresi? Neden?"],
+ mid:["Son tasarım projeni anlat: problem neydi, sen ne yaptın? (80–100 kelime)","Bir şirkete kısa bir e-posta yaz: kendini tanıt ve staj fırsatı sor","Gittiğin ya da gitmek istediğin bir şehri anlat (80 kelime)","Günlük hayatta kullandığın kötü tasarlanmış bir ürünü anlat. Nasıl düzeltirdin?","Bir dizi ya da film öner: neden izlenmeli?","Geçen yıl yaşadığın zor bir şeyi ve ondan ne öğrendiğini anlat","Hayalindeki stüdyo nasıl olurdu? (would kullan)"],
+ high:["Portfolyon için bir proje açıklaması yaz (120–150 kelime)","\"Sürdürülebilir tasarım sadece malzeme seçimi değildir.\" Katılıyor musun? (150–200 kelime, IELTS Task 2 tarzı)","Bir staj başvurusu için ön yazı (cover letter) taslağı yaz","\"Form follows function\" bugün hâlâ geçerli mi? Fikrini savun","Bir müşteriye kibar ama net bir e-posta yaz: teslim tarihi bir hafta gecikecek","Yapay zekâ tasarımcıların işini nasıl değiştiriyor? Avantaj ve riskler","Online eğitim mi yüz yüze eğitim mi? Karşılaştır ve sonuca var"]
+};
+const S_TOPICS = {
+ low:["Kendini tanıt","Bugün ne yaptın?","Ailen ve evin","Sevdiğin bir yemek","Telefonundaki en sevdiğin uygulama","Okuldaki bir günün","Hafta sonu ne yaparsın?"],
+ mid:["Son projeni bir arkadaşına anlat","Unutamadığın bir seyahat","Kötü tasarlanmış bir ürün","5 yıl sonra nerede olmak istersin?","En sevdiğin tasarımcı ya da marka","Bir film ya da diziyi anlat","Staj mülakatı: 'Tell me about yourself'"],
+ high:["Bir projeni jüriye sun (1 dakika)","Sürdürülebilirlik ve tasarım","Yapay zekâ ve yaratıcılık","Bir tasarım hatası ve ondan öğrendiğin","Mülakat: 'What's your biggest weakness?'","Şehirlerde toplu taşıma nasıl iyileştirilir?","IELTS Part 2: Sık kullandığın bir nesneyi anlat"]
+};
+
+// Resources. lv = [min,max] index; skills; type; free
+const RES = [
+ {n:"EF SET",k:"Seviye testi",i:"📏",u:"https://www.efset.org/",lv:[0,4],s:["reading","listening"],f:true,d:"Ücretsiz, standart bir İngilizce testi. Buradaki testten sonra 'resmi' bir bakış için iyi. 2–3 ayda bir tekrarla."},
+ {n:"English Grammar in Use serisi (Raymond Murphy, Cambridge)",k:"Kitap",i:"📘",lv:[0,4],s:["grammar"],f:false,d:"Gramerin en çok önerilen kitabı. Kırmızı 'Essential' (A1–B1), mavi 'Intermediate' (B1–B2), yeşil 'Advanced' (C1). Sol sayfa konu, sağ sayfa alıştırma: tam 15 dakikalık bir ders."},
+ {n:"English Vocabulary in Use (Cambridge)",k:"Kitap",i:"📗",lv:[0,4],s:["vocab"],f:false,d:"Kelimeleri konu konu, örnek cümleyle öğretir. Seviyene göre Elementary / Pre-int. & Int. / Upper-int. / Advanced."},
+ {n:"Graded readers (Oxford Bookworms, Penguin Readers)",k:"Kitap",i:"📚",lv:[0,3],s:["reading","vocab"],f:false,d:"Seviyeye göre sadeleştirilmiş romanlar. Okumayı sevdirmenin en iyi yolu: sözlüksüz, keyifle, bitirebileceğin kitaplar. Bookworms Stage 1–2 (A1–A2), 3–4 (B1), 5–6 (B2)."},
+ {n:"The Design of Everyday Things (Don Norman)",k:"Kitap",i:"🚪",lv:[3,4],s:["reading","vocab"],f:false,d:"Tasarım öğrencisi için İngilizce okumaya en iyi geçiş: konuyu zaten bildiğin için anlam kendiliğinden oturur."},
+ {n:"Practical English Usage (Michael Swan)",k:"Kitap",i:"📕",lv:[3,4],s:["grammar","writing"],f:false,d:"Ders kitabı değil, başvuru kitabı. 'Bunu nasıl söylerdim?' dediğin anlarda bakılır."},
+ {n:"BBC Learning English – 6 Minute English",k:"Podcast",i:"🎧",u:"https://www.bbc.co.uk/learningenglish/english/features/6-minute-english",lv:[1,3],s:["listening","vocab"],f:true,d:"6 dakikalık bölümler, transkript ve kelime listesiyle. Önce transkriptsiz dinle, sonra okuyarak tekrar dinle."},
+ {n:"British Council LearnEnglish",k:"Site",i:"🌐",u:"https://learnenglish.britishcouncil.org/",lv:[0,3],s:["grammar","listening","reading"],f:true,d:"Seviyeye göre ücretsiz gramer, dinleme ve okuma alıştırmaları."},
+ {n:"ELLLO",k:"Site",i:"🗣️",u:"https://elllo.org/",lv:[0,2],s:["listening"],f:true,d:"Dünyanın her yerinden gerçek insanlarla kısa, doğal konuşmalar. Farklı aksanlara alışırsın."},
+ {n:"News in Levels",k:"Site",i:"📰",u:"https://www.newsinlevels.com/",lv:[0,2],s:["reading","listening"],f:true,d:"Aynı haber 3 seviyede, sesli. Level 1'den başla, rahatlayınca 2'ye geç."},
+ {n:"Breaking News English",k:"Site",i:"🗞️",u:"https://breakingnewsenglish.com/",lv:[1,3],s:["reading","listening","vocab"],f:true,d:"Güncel haberler 7 seviyede, alıştırmalarıyla."},
+ {n:"Dezeen",k:"Site",i:"🪑",u:"https://www.dezeen.com/",lv:[3,4],s:["reading","vocab"],f:true,d:"Tasarım ve mimarlık haberleri. Kendi alanının dilini burada öğrenirsin: portfolyo ve mülakat kelimeleri."},
+ {n:"99% Invisible",k:"Podcast",i:"🎙️",u:"https://99percentinvisible.org/",lv:[3,4],s:["listening"],f:true,d:"Gündelik nesnelerin ve şehirlerin tasarım hikâyeleri. B2'de transkriptle başla."},
+ {n:"Design Matters",k:"Podcast",i:"🎙️",u:"https://designmattersmedia.com/",lv:[3,4],s:["listening"],f:true,d:"Tasarımcılarla uzun sohbetler. Mülakat ve kariyer dili için iyi."},
+ {n:"TED Talks",k:"Video",i:"▶️",u:"https://www.ted.com/talks",lv:[2,4],s:["listening","speaking"],f:true,d:"İngilizce altyazılı ve transkriptli. Tasarım konuşmalarını seç; B1'de altyazıyla, C1'de altyazısız izle."},
+ {n:"Rachel's English (YouTube)",k:"Video",i:"👄",u:"https://www.youtube.com/@rachelsenglish",lv:[1,4],s:["speaking","listening"],f:true,d:"Amerikan telaffuzu: ağız hareketleri, vurgu, bağlantılı konuşma. Shadowing için çok iyi."},
+ {n:"English with Lucy (YouTube)",k:"Video",i:"👄",u:"https://www.youtube.com/@EnglishwithLucy",lv:[0,3],s:["speaking","vocab","grammar"],f:true,d:"İngiliz aksanı, telaffuz ve günlük ifadeler. Kısa, sakin videolar."},
+ {n:"YouGlish",k:"Araç",i:"🔎",u:"https://youglish.com/",lv:[1,4],s:["speaking","listening"],f:true,d:"Bir kelimeyi yaz, YouTube'da gerçek insanların onu nasıl söylediğini dinle."},
+ {n:"Cambridge Dictionary",k:"Araç",i:"📖",u:"https://dictionary.cambridge.org/",lv:[0,4],s:["vocab"],f:true,d:"Sesli telaffuz, seviye etiketi (A1–C2) ve örnek cümleler. Google Çeviri yerine bunu alışkanlık yap."},
+ {n:"Write & Improve (Cambridge)",k:"Araç",i:"✍️",u:"https://writeandimprove.com/",lv:[1,4],s:["writing"],f:true,d:"Yazdığın metne otomatik seviye ve geri bildirim verir. Buradaki 'Claude'a düzelttir' ile birlikte kullan."},
+ {n:"Anki",k:"Uygulama",i:"🗂️",u:"https://apps.ankiweb.net/",lv:[0,4],s:["vocab"],f:true,d:"Aralıklı tekrar kartları. Bu uygulamadaki kartlar aynı mantıkla çalışıyor; büyük bir kelime destesi istersen Anki'ye geç (Android ve bilgisayarda ücretsiz)."},
+ {n:"Language Reactor",k:"Tarayıcı eklentisi",i:"🎬",u:"https://www.languagereactor.com/",lv:[1,4],s:["listening","vocab"],f:true,d:"Netflix/YouTube'da İngilizce ve Türkçe altyazıyı aynı anda gösterir, kelimeye tıklayınca anlamı çıkar. Dizi izlemeyi derse çevirir."},
+ {n:"Claude sesli sohbet",k:"Konuşma",i:"💬",u:"https://claude.ai/",lv:[1,4],s:["speaking","listening"],f:true,d:"Claude mobil uygulamasında sesli modla İngilizce konuş. 'Pratik → Konuş' ekranındaki hazır komutu kopyala, Claude seviyene göre konuşsun ve hatalarını sonda toplasın."},
+ {n:"Tandem / HelloTalk",k:"Uygulama",i:"🤝",u:"https://tandem.net/",lv:[2,4],s:["speaking","writing"],f:true,d:"Türkçe öğrenmek isteyen biriyle dil değişimi. B1'e gelince gerçek insanlarla konuşmak için."},
+ {n:"italki",k:"Özel ders",i:"👩‍🏫",u:"https://www.italki.com/",lv:[1,4],s:["speaking"],f:false,d:"Saatlik online öğretmen. Haftada 1 kez 30 dakikalık konuşma dersi, en hızlı ilerleme getiren yatırımdır."},
+ {n:"Duolingo",k:"Uygulama",i:"🦉",lv:[0,1],s:["vocab"],f:true,d:"Dürüst not: tek başına seni konuşturmaz. Sadece ısınma ya da 'bugün hiç vaktim yok' günleri için."},
+ {n:"IELTS (resmi site + Cambridge IELTS kitapları)",k:"Sınav",i:"🎓",u:"https://ielts.org/",lv:[2,4],s:["reading","writing","listening","speaking"],f:false,d:"Yurtdışı yüksek lisans/değişim için en yaygın sınav. Cambridge IELTS 1–19 serisi gerçek geçmiş sınavları içerir. B1 sonrası hazırlığa başla."},
+ {n:"TOEFL iBT (ETS)",k:"Sınav",i:"🎓",u:"https://www.ets.org/toefl.html",lv:[2,4],s:["reading","writing","listening","speaking"],f:false,d:"Özellikle ABD için. Bilgisayarda yapılır; ETS'in resmi deneme testleriyle çalış."},
+ {n:"YDS / YÖKDİL (ÖSYM)",k:"Sınav",i:"🎓",u:"https://www.osym.gov.tr/",lv:[1,4],s:["reading","vocab","grammar"],f:false,d:"Türkiye'deki akademik/kamu sınavları. Konuşma ve yazma yok; okuma, kelime ve gramer ağırlıklı. Çıkmış sorular ÖSYM sitesinde."}
+];
+
+/* ================= STATE ================= */
+const KEY = "ingilizce-defteri-v1";
+function fresh(){ return {v:1, onboarded:false, levels:null, testDate:null, history:[], cards:{}, custom:[], newOn:{}, done:{}, grammarDone:[], journal:[], settings:{newPerDay:5, rate:0.9}}; }
+let S = (()=>{ try{ const r = localStorage.getItem(KEY); if(r){ return Object.assign(fresh(), JSON.parse(r)); } }catch(e){} return fresh(); })();
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
+
+/* ================= HELPERS ================= */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const pad = n => String(n).padStart(2,"0");
+const ymd = d => d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+const today = () => ymd(new Date());
+const addDays = (s,n) => { const d = new Date(s+"T12:00:00"); d.setDate(d.getDate()+n); return ymd(d); };
+const dayNo = () => Math.floor(new Date(today()+"T12:00:00").getTime()/864e5);
+function lvOf(sk){ return S.levels ? S.levels[sk] : -1; }          // -1..4  (highest level passed)
+function workOf(sk){ return Math.min(4, lvOf(sk)+1); }               // level being worked on
+function band(w){ return w<=1 ? "low" : w===2 ? "mid" : "high"; }
+function lvName(lv){ return lv<0 ? "Başlangıç" : LV[lv]; }
+function overall(){ if(!S.levels) return -1; const v = Object.values(S.levels); return Math.round(v.reduce((a,b)=>a+b,0)/v.length); }
+function toast(m){ const t=document.createElement("div"); t.className="toast"; t.textContent=m; document.body.appendChild(t); setTimeout(()=>t.remove(),2200); }
+function copyText(t){
+  if(navigator.clipboard && window.isSecureContext){ return navigator.clipboard.writeText(t).catch(()=>fallbackCopy(t)); }
+  fallbackCopy(t); return Promise.resolve();
+}
+function fallbackCopy(t){ const a=document.createElement("textarea"); a.value=t; document.body.appendChild(a); a.select(); try{document.execCommand("copy");}catch(e){} a.remove(); }
+let VOICE = null;
+function pickVoice(){
+  if(!("speechSynthesis" in window)) return;
+  const vs = speechSynthesis.getVoices().filter(v=>/^en[-_]/i.test(v.lang));
+  VOICE = vs.find(v=>/Google US|Samantha|Aria|Jenny/i.test(v.name)) || vs.find(v=>/en[-_]US/i.test(v.lang)) || vs[0] || null;
+}
+if("speechSynthesis" in window){ pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
+function speak(text, slow){
+  if(!("speechSynthesis" in window)){ toast("Tarayıcın sesli okumayı desteklemiyor."); return; }
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text); u.lang = VOICE ? VOICE.lang : "en-US"; if(VOICE) u.voice = VOICE;
+  u.rate = slow ? 0.7 : (S.settings.rate || 0.9); speechSynthesis.speak(u);
+}
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+const norm = s => s.toLowerCase().replace(/[’']/g,"'").replace(/[^a-z0-9' ]+/g," ").split(/\s+/).filter(Boolean);
+function compare(target, said){
+  const a = norm(target), b = norm(said);
+  const L = Array.from({length:a.length+1},()=>new Array(b.length+1).fill(0));
+  for(let i=a.length-1;i>=0;i--) for(let j=b.length-1;j>=0;j--) L[i][j] = a[i]===b[j] ? L[i+1][j+1]+1 : Math.max(L[i+1][j],L[i][j+1]);
+  const hit = new Array(a.length).fill(false); let i=0,j=0;
+  while(i<a.length && j<b.length){ if(a[i]===b[j]){hit[i]=true;i++;j++;} else if(L[i+1][j]>=L[i][j+1]) i++; else j++; }
+  const words = target.split(/\s+/); let k=0;
+  const html = words.map(w=>{ const n=norm(w); if(!n.length) return esc(w); const ok = hit[k]; k+=n.length; return `<span class="${ok?"hit":"miss"}">${esc(w)}</span>`; }).join(" ");
+  return {pct: a.length ? Math.round(100*L[0][0]/a.length) : 0, html};
+}
+const ICON = {
+  play:'<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>',
+  check:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>',
+  mic:'<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>',
+  stop:'<svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>'
+};
+function playBtn(text, label){ return `<button class="btn" data-say="${esc(text)}">${ICON.play} ${label||"Dinle"}</button><button class="btn ghost" data-say-slow="${esc(text)}">Yavaş</button>`; }
+document.addEventListener("click", e=>{
+  const s = e.target.closest("[data-say]"); if(s){ speak(s.dataset.say); return; }
+  const sl = e.target.closest("[data-say-slow]"); if(sl){ speak(sl.dataset.saySlow, true); }
+});
+
+/* ================= CLAUDE BRIDGE ================= */
+function bridge(title, prompt, opts){
+  opts = opts || {};
+  const ov = document.createElement("div"); ov.className = "ov";
+  ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true">
+    <div class="between"><h3 style="margin:0">${esc(title)}</h3><button class="btn ghost" data-x>Kapat</button></div>
+    <ol>
+      <li><b>Komutu kopyala, Claude'u aç</b> ve yeni sohbete yapıştır.
+        <textarea class="q" readonly>${esc(prompt)}</textarea>
+        <div class="row" style="margin-top:8px"><button class="btn primary" data-go>Kopyala ve Claude'u aç</button><button class="btn" data-copy>Sadece kopyala</button></div></li>
+      ${opts.save ? `<li><b>İstersen cevabı buraya yapıştır</b>, yazının altına kaydedeyim.
+        <textarea data-ans rows="5" placeholder="Claude'un cevabı (isteğe bağlı)"></textarea>
+        <div class="row" style="margin-top:8px"><button class="btn" data-save>Kaydet</button></div></li>` : ""}
+    </ol>
+    <p class="tiny" style="margin:0">${esc(opts.tip || "Önce kendin dene, sonra Claude'a sor. Cevabı okurken 'neden?' diye sor; düzeltmeleri ezberleme, kuralı yakala.")}</p>
+  </div>`;
+  document.body.appendChild(ov);
+  const close = ()=>ov.remove();
+  ov.addEventListener("click", e=>{ if(e.target===ov || e.target.closest("[data-x]")) close(); });
+  ov.querySelector("[data-copy]").onclick = ()=>copyText(prompt).then(()=>toast("Kopyalandı"));
+  ov.querySelector("[data-go]").onclick = ()=>{ copyText(prompt).then(()=>toast("Kopyalandı, Claude'a yapıştır")); window.open("https://claude.ai/new","_blank","noopener"); };
+  const sv = ov.querySelector("[data-save]");
+  if(sv) sv.onclick = ()=>{ const v = ov.querySelector("[data-ans]").value.trim(); if(v){ opts.save(v); toast("Kaydedildi"); } close(); };
+}
+const P = {
+  grammar:(topic,lv)=>`Ben Türkçe konuşan, İngilizce seviyesi yaklaşık ${lv} olan bir tasarım öğrencisiyim. İngilizceye karşı eski bir çekincem var, o yüzden sade ve cesaretlendirici ol.
+
+Bana "${topic}" konusunu Türkçe anlat:
+1) En fazla 10 satırda, ne zaman ve neden kullanıldığını anlat.
+2) Tasarım, okul ve günlük hayattan 4 örnek cümle ver (Türkçe çevirileriyle).
+3) Türklerin bu konuda yaptığı 2 tipik hatayı göster.
+4) Bana 5 alıştırma sorusu sor. Cevapları en sona "CEVAPLAR" başlığıyla yaz, ben önce kendim çözeceğim.`,
+  writing:(task,lv,text)=>`Aşağıdaki İngilizce metni ben yazdım. Seviyem yaklaşık ${lv}. Konu: ${task}
+
+Lütfen metnimi baştan yazma. Şunları yap:
+1) Hataları tek tek göster: "yanlış → doğru" ve Türkçe kısa açıklama.
+2) En çok tekrarladığım hatayı "BU HAFTANIN KURALI" olarak ver.
+3) Metnimde iyi olan 2 şeyi söyle.
+4) Bir üst seviyeye çıkmak için bu metinde kullanabileceğim 3 doğal ifade öner.
+5) En sonda düzeltilmiş halini ver, ama sadece yukarıdakileri okuduktan sonra bakacağım.
+
+Metin:
+${text}`,
+  speaking:(topic,lv,text)=>`Aşağıdaki metin benim İngilizce konuşmamın otomatik yazıya dökülmüş hali (noktalama ve büyük harf hatalarını görmezden gel, yanlış duyulmuş kelimeler olabilir). Seviyem yaklaşık ${lv}. Konu: ${topic}
+
+1) Gramer ve kelime hatalarımı "söylediğim → doğal hali" şeklinde, Türkçe kısa açıklamayla listele (en önemli 5 tanesi).
+2) Konuşmamı daha akıcı yapacak 3 bağlaç/kalıp öner.
+3) Aynı şeyi ${lv} seviyesinde bir öğrencinin söyleyebileceği doğal bir versiyonla yaz ki sesli tekrar edeyim.
+
+Konuşmam:
+${text}`,
+  chat:(lv)=>`Benimle İngilizce sohbet et. Seviyem yaklaşık ${lv}, Türkçe konuşan bir endüstriyel tasarım öğrencisiyim. Kurallar:
+- Benim seviyeme uygun, kısa ve net konuş; her mesajda sadece bir soru sor.
+- Konuşmayı kesip hatalarımı düzeltme; akış bozulmasın.
+- Takılırsam ipucu ver, gerekirse bir kelimeyi Türkçe söylememe izin ver.
+- Ben "bitti" deyince: en önemli 5 hatamı (yanlış → doğru, Türkçe açıklama) ve kullanabileceğim 5 yeni ifadeyi listele.
+Konu önerisi: tasarım projelerim, okul, seyahat ya da günlük hayatım. Sen başla.`,
+  reading:(lv,topic)=>`Bana ${lv} seviyesinde, "${topic}" hakkında yaklaşık 180 kelimelik özgün bir İngilizce metin yaz. Sonra:
+1) 3 anlama sorusu sor (cevapları en sona "CEVAPLAR" başlığıyla yaz).
+2) Metindeki ${lv} seviyesine uygun 6 faydalı kelimeyi Türkçe anlamı ve örnek cümlesiyle listele.`,
+  placement:(text)=>`Ben Türkçe konuşan bir İngilizce öğrencisiyim. Aşağıdaki kısa metni seviyemi ölçmek için yazdım. Lütfen:
+1) Yazma seviyemi CEFR'e göre (A1–C1) tahmin et ve nedenini 2 cümleyle açıkla.
+2) En belirgin 3 eksiğimi göster.
+3) Önümüzdeki 4 hafta odaklanmam gereken 3 şeyi söyle.
+
+Metin:
+${text}`
+};
+
+/* ================= ROUTER ================= */
+const TABS = [
+ ["bugun","Bugün",'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>'],
+ ["kelime","Kelime",'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="14" height="14" rx="3"/><path d="M7 3h11a3 3 0 0 1 3 3v11"/></svg>'],
+ ["pratik","Pratik",'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.8 7L4 20l1-5A8 8 0 1 1 21 12z"/></svg>'],
+ ["kaynak","Kaynaklar",'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 21V5M8 7h7"/></svg>'],
+ ["ben","Seviyem",'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20V14M10 20V9M16 20V4M22 20H2"/></svg>']
+];
+function route(){ const h = (location.hash||"#bugun").slice(1).split("/"); return {page:h[0]||"bugun", sub:h[1]||""}; }
+function render(){
+  if("speechSynthesis" in window) speechSynthesis.cancel();
+  stopRec();
+  const r = route();
+  const inTest = r.page==="test";
+  $("#tabbar").style.display = inTest || !S.onboarded ? "none" : "";
+  $("#tabbar").innerHTML = `<nav>${TABS.map(t=>`<a href="#${t[0]}" ${t[0]===r.page?'aria-current="page"':""}>${t[2]}${t[1]}</a>`).join("")}</nav>`;
+  const m = $("#main"); m.onclick = null;
+  if(!S.onboarded && !inTest){ m.innerHTML = vWelcome(); bindWelcome(); return; }
+  const V = {bugun:vToday, kelime:vCards, pratik:vPractice, kaynak:vRes, ben:vMe, test:vTest, sonuc:vResult}[r.page] || vToday;
+  V(m, r.sub); window.scrollTo(0,0);
+}
+window.addEventListener("hashchange", render);
+
+/* ================= WELCOME ================= */
+function vWelcome(){
+  return `<h1>Merhaba 👋</h1>
+  <p class="sub">Yıllardır ertelediğin bir şeye başlıyorsun. Bu sefer farklı yapalım:</p>
+  <div class="why">
+    <div class="card"><div class="n">🫶</div><div><h3>Hata = bilgi</h3><div class="muted small">Kırmızı çarpı yok, not yok. Yanlışların sadece neye çalışacağımızı gösterir. "Bilmiyorum" demek de bir cevap.</div></div></div>
+    <div class="card"><div class="n">⏱️</div><div><h3>Günde 15–20 dakika</h3><div class="muted small">Her gün bir beceri, artı 5 dakika kelime. Bir günü kaçırmak sorun değil. Tek kural: iki gün üst üste kaçırma.</div></div></div>
+    <div class="card"><div class="n">🪑</div><div><h3>Senin dünyandan</h3><div class="muted small">Okul ve tasarım, staj ve iş, seyahat, sınav. Örnekler ve kelimeler hep bunlardan.</div></div></div>
+    <div class="card"><div class="n">🧭</div><div><h3>Önce nerede olduğunu bulalım</h3><div class="muted small">6 beceride kısa bir seviye testi, yaklaşık 15 dakika. Sonra planın buna göre kurulur.</div></div></div>
+  </div>
+  <a class="btn primary block" href="#test">Seviye testine başla</a>
+  <p class="tiny" style="text-align:center;margin-top:12px">Testi sonra da yapabilirsin. <a href="#" data-skip>Şimdilik başlangıç seviyesinden başla</a></p>`;
+}
+function bindWelcome(){
+  const s = document.querySelector("[data-skip]");
+  if(s) s.onclick = e=>{ e.preventDefault(); S.onboarded = true; S.levels = {vocab:-1,grammar:-1,reading:-1,listening:-1,writing:-1,speaking:-1}; save(); location.hash="#bugun"; render(); };
+}
+
+/* ================= PLACEMENT TEST ================= */
+let T = null;
+function buildTest(){
+  const q = [];
+  q.push({type:"intro", sec:"vocab", title:"1 / 6 · Kelime", text:"Bir İngilizce kelime göreceksin, Türkçe anlamını seç. Kolaydan zora gidiyor. Bilmiyorsan tahmin etme, \"Bilmiyorum\"a bas: seviyeni daha doğru buluruz."});
+  T_VOCAB.forEach(x=>q.push({type:"mc", sec:"vocab", lv:x[0], html:`<div class="muted small">Bu kelime ne demek?</div><div class="qword">${esc(x[1])}</div>`, o:x[2], a:x[3]}));
+  q.push({type:"intro", sec:"grammar", title:"2 / 6 · Gramer", text:"Boşluğa gelecek doğru kelimeyi seç. Kuralın adını bilmen gerekmiyor, kulağına doğru geleni seç."});
+  T_GRAM.forEach(x=>q.push({type:"mc", sec:"grammar", lv:x[0], html:`<div class="qword" style="font-size:24px">${esc(x[1]).replace("___","<u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u>")}</div>`, o:x[2], a:x[3]}));
+  q.push({type:"intro", sec:"reading", title:"3 / 6 · Okuma", text:"Kısa metinler okuyup Türkçe soruları cevaplayacaksın. Her şeyi anlaman gerekmiyor; ana fikri yakalamaya çalış."});
+  T_READ.forEach(p=>p.qs.forEach(x=>q.push({type:"mc", sec:"reading", lv:p.lv, html:`<div class="passage" lang="en">${esc(p.text)}</div><b>${esc(x[0])}</b>`, o:x[1], a:x[2]})));
+  q.push({type:"intro", sec:"listening", title:"4 / 6 · Dinleme", text:"Bir cümle dinleyeceksin (sesin açık olsun). İstediğin kadar tekrar dinleyebilirsin, ama metni göremezsin."});
+  T_LIST.forEach(x=>q.push({type:"mc", sec:"listening", lv:x[0], say:x[1], html:`<div class="row" style="margin:6px 0 14px">${playBtn(x[1],"Cümleyi dinle")}</div><b>${esc(x[2])}</b>`, o:x[3], a:x[4]}));
+  q.push({type:"self", sec:"writing", title:"5 / 6 · Yazma", text:"Hangilerini yapabileceğini düşünüyorsun? Dürüst ol, kimse görmüyor. Emin değilsen işaretleme."});
+  q.push({type:"self", sec:"speaking", title:"6 / 6 · Konuşma", text:"Aynı şekilde: rahatça yapabildiklerini işaretle."});
+  return {i:0, q, ans:{}, self:{writing:[], speaking:[]}};
+}
+function vTest(m){
+  if(!T) T = buildTest();
+  const it = T.q[T.i];
+  const pct = Math.round(100*T.i/T.q.length);
+  const head = `<div class="between"><a class="btn ghost" href="#${S.onboarded?"ben":"bugun"}" data-quit>Vazgeç</a><span class="tiny">${SK[it.sec]}</span></div><div class="progress"><i style="width:${pct}%"></i></div>`;
+  if(it.type==="intro"){
+    m.innerHTML = head + `<h1>${esc(it.title)}</h1><p class="sub">${esc(it.text)}</p><button class="btn primary block" data-next>Başla</button>`;
+  } else if(it.type==="mc"){
+    m.innerHTML = head + `<div lang="en">${it.html}</div><div class="opts">${it.o.map((o,k)=>`<button class="opt" data-k="${k}">${esc(o)}</button>`).join("")}<button class="opt idk" data-k="-1">Bilmiyorum</button></div>
+    <p style="text-align:center;margin-top:18px"><button class="btn ghost small" data-skipsec>Bu bölüm bana çok zor geliyor, sonraki bölüme geç</button></p>`;
+    if(it.say) setTimeout(()=>speak(it.say), 350);
+  } else {
+    const rows = T_SELF[it.sec].map((pair,l)=>pair.map((t,j)=>`<label class="check"><input type="checkbox" data-l="${l}" data-j="${j}"><span>${esc(t)} <span class="tag">${LV[l]}</span></span></label>`).join("")).join("");
+    m.innerHTML = head + `<h1>${esc(it.title)}</h1><p class="sub">${esc(it.text)}</p><div class="card" style="padding:4px 18px">${rows}</div><button class="btn primary block" data-selfnext>Devam</button>`;
+  }
+  m.onclick = e=>{
+    if(e.target.closest("[data-quit]")){ T = null; return; }
+    if(e.target.closest("[data-next]")){ T.i++; vTest(m); return; }
+    const o = e.target.closest("[data-k]");
+    if(o){ T.ans[T.i] = +o.dataset.k === it.a; T.i++; vTest(m); return; }
+    if(e.target.closest("[data-skipsec]")){ const sec = it.sec; while(T.i<T.q.length && T.q[T.i].sec===sec){ T.ans[T.i]=false; T.i++; } vTest(m); return; }
+    if(e.target.closest("[data-selfnext]")){
+      T.self[it.sec] = [...m.querySelectorAll("input:checked")].map(c=>+c.dataset.l);
+      T.i++;
+      if(T.i>=T.q.length) finishTest(); else vTest(m);
+    }
+  };
+}
+function finishTest(){
+  const res = {};
+  ["vocab","grammar","reading","listening"].forEach(sec=>{
+    const by = [0,0,0,0,0].map(()=>({n:0,ok:0}));
+    T.q.forEach((x,i)=>{ if(x.sec===sec && x.type==="mc"){ by[x.lv].n++; if(T.ans[i]) by[x.lv].ok++; } });
+    let lv = -1;
+    for(let l=0;l<5;l++){ if(by[l].n && by[l].ok/by[l].n >= 0.5) lv = l; else break; }
+    res[sec] = lv;
+  });
+  ["writing","speaking"].forEach(sec=>{
+    const c = T.self[sec]; let lv = -1;
+    for(let l=0;l<5;l++){ if(c.includes(l)) lv = l; else break; }
+    res[sec] = lv;
+  });
+  S.levels = res; S.testDate = today(); S.history.push({date:today(), levels:res}); S.onboarded = true;
+  save(); T = null; location.hash = "#sonuc";
+}
+
+/* ================= RESULT ================= */
+function levelRows(){
+  return Object.keys(SK).map(k=>{ const lv=lvOf(k), w=workOf(k);
+    return `<div class="lvl"><span>${SK[k]}</span><div class="bars">${LV.map((_,i)=>`<i class="${i<=lv?"on":i===w&&w>lv?"work":""}"></i>`).join("")}</div><b>${lvName(lv)}</b></div>`; }).join("");
+}
+function weakest(){ return Object.keys(SK).reduce((a,b)=>lvOf(b)<lvOf(a)?b:a); }
+function strongest(){ return Object.keys(SK).reduce((a,b)=>lvOf(b)>lvOf(a)?b:a); }
+function vResult(m){
+  const w = weakest(), s = strongest();
+  m.innerHTML = `<h1>Seviyen 🎉</h1><p class="sub">Testi bitirdin. Bu bir başlangıç noktası, sınav sonucu değil.</p>
+  <div class="card">${levelRows()}<div class="tiny" style="margin-top:8px">Dolu çubuk: geçtiğin seviye · Çizgili: şu an çalışacağın seviye</div></div>
+  <div class="card soft"><h3>Ne anlama geliyor?</h3>
+   <p class="small" style="margin:0 0 8px">En güçlü yanın <b>${SK[s]}</b> (${lvName(lvOf(s))}). En çok desteğe ihtiyacı olan <b>${SK[w]}</b> (${lvName(lvOf(w))}).</p>
+   <p class="small" style="margin:0">Seviyelerin farklı çıkması çok normal. Türkiye'de okulda öğrenen çoğu kişide okuma ve gramer, konuşma ve dinlemeden önde olur. Planın her beceriyi kendi seviyesinden çalıştırır.</p></div>
+  <div class="card"><h3>Yazma seviyeni Claude'a da ölçtür (isteğe bağlı)</h3>
+   <p class="small muted" style="margin:0 0 8px">Kendi değerlendirmen yazma için bir tahmin. İngilizce 3–5 cümle yaz: kendini, okulunu ve neden İngilizce öğrenmek istediğini anlat. Ne kadar basit olursa olsun.</p>
+   <textarea id="pw" rows="4" lang="en" placeholder="My name is ..."></textarea>
+   <div class="row" style="margin-top:8px"><button class="btn" id="pwb">Claude'a değerlendirt</button></div></div>
+  <a class="btn primary block" href="#bugun">Planıma git</a>
+  <p class="tiny" style="text-align:center">Daha resmi bir ölçüm istersen ücretsiz <a href="https://www.efset.org/" target="_blank" rel="noopener">EF SET</a> testini de yapabilirsin. 6–8 hafta sonra buradaki testi tekrarla, farkı görürsün.</p>`;
+  $("#pwb").onclick = ()=>{ const t=$("#pw").value.trim(); if(!t){ toast("Önce birkaç cümle yaz"); return; } bridge("Yazma seviyeni ölç", P.placement(t)); };
+}
+
+/* ================= TODAY / PLAN ================= */
+const DOW = ["Paz","Pzt","Sal","Çar","Per","Cum","Cmt"];
+const DAYPLAN = {1:"grammar",2:"reading",3:"listening",4:"writing",5:"speaking",6:"fun",0:"review"};
+function nextGrammar(){
+  for(let l=workOf("grammar"); l<5; l++){ const t = GRAMMAR[l].find(x=>!S.grammarDone.includes(x)); if(t) return {lv:l, topic:t}; }
+  return {lv:4, topic:GRAMMAR[4][dayNo()%GRAMMAR[4].length]};
+}
+function pick(arr){ return arr[dayNo() % arr.length]; }
+function mainTask(dow){
+  const kind = DAYPLAN[dow];
+  if(kind==="grammar"){
+    const g = nextGrammar();
+    return {kind, icon:"🧩", title:"Gramer: "+g.topic, min:12, tag:LV[g.lv],
+      steps:["Claude'a konuyu Türkçe anlattır (aşağıdaki buton hazır komutu kopyalar).","Alıştırma sorularını önce kendin çöz, sonra cevaplara bak.","Bu kuralla kendi hayatından 3 cümle yaz.", "Kitabın varsa: Grammar in Use'ta aynı konunun ünitesini yap."],
+      actions:`<button class="btn" data-act="gbridge" data-topic="${esc(g.topic)}" data-lv="${LV[g.lv]}">Claude'a anlattır</button><button class="btn ghost" data-act="gdone" data-topic="${esc(g.topic)}">Bu konuyu öğrendim →</button>`};
+  }
+  if(kind==="reading"){
+    const w = workOf("reading"), b = band(w);
+    const src = b==="low" ? {t:"News in Levels'ta bir haber oku (Level 1 ile başla).", u:"https://www.newsinlevels.com/", n:"News in Levels"}
+      : b==="mid" ? {t:"Breaking News English'te seviyene uygun bir haber oku ya da graded reader'dan bir bölüm.", u:"https://breakingnewsenglish.com/", n:"Breaking News English"}
+      : {t:"Dezeen'den kısa bir tasarım haberi oku.", u:"https://www.dezeen.com/", n:"Dezeen"};
+    return {kind, icon:"📖", title:"Okuma", min:12, tag:LV[w],
+      steps:[src.t,"Önce sözlüksüz baştan sona oku. Her kelimeyi anlaman gerekmiyor.","Ana fikri Türkçe tek cümleyle kendine söyle.","En faydalı 3–5 kelimeyi seç, Kelime sekmesinden kartlarına ekle."],
+      actions:`<a class="btn" href="${src.u}" target="_blank" rel="noopener">${src.n}'ı aç</a><button class="btn ghost" data-act="rbridge" data-lv="${LV[w]}">Ya da Claude bana metin yazsın</button>`};
+  }
+  if(kind==="listening"){
+    const w = workOf("listening"), b = band(w);
+    const st = b==="low" ? ["Pratik → Dinle'de 5 cümlelik dikte yap.","ELLLO'dan kısa bir konuşma dinle: önce sadece dinle, sonra metinle birlikte."]
+      : b==="mid" ? ["BBC 6 Minute English'ten bir bölüm aç.","Önce transkriptsiz dinle, anladığını kafanda özetle.","Sonra transkripti okuyarak tekrar dinle. Kaçırdığın 3 ifadeyi kartlara ekle."]
+      : ["99% Invisible ya da bir TED tasarım konuşmasından 10 dakika dinle.", w>=4 ? "Altyazısız dinle, sonra emin olmadığın yeri transkriptle kontrol et." : "İngilizce altyazıyla başla; ikinci dinlemede altyazıyı kapat.","Duyduğun 3 doğal ifadeyi not et."];
+    const link = b==="low" ? `<a class="btn" href="#pratik/dinle">Dikteye git</a><a class="btn ghost" href="https://elllo.org/" target="_blank" rel="noopener">ELLLO</a>`
+      : b==="mid" ? `<a class="btn" href="https://www.bbc.co.uk/learningenglish/english/features/6-minute-english" target="_blank" rel="noopener">6 Minute English</a><a class="btn ghost" href="#pratik/dinle">Dikte</a>`
+      : `<a class="btn" href="https://99percentinvisible.org/" target="_blank" rel="noopener">99% Invisible</a><a class="btn ghost" href="https://www.ted.com/talks" target="_blank" rel="noopener">TED</a>`;
+    return {kind, icon:"🎧", title:"Dinleme", min:12, tag:LV[w], steps:st, actions:link};
+  }
+  if(kind==="writing"){
+    const w = workOf("writing");
+    return {kind, icon:"✍️", title:"Yazma", min:15, tag:LV[w],
+      steps:["Bugünün konusu: <b>"+esc(pick(W_PROMPTS[band(w)]))+"</b>","Çeviri yapmadan, doğrudan İngilizce yaz. Basit cümleler tamamen yeterli.","Bitince Claude'a düzelttir: metni baştan yazmayacak, hatalarını ve bir kuralı gösterecek.","Haftanın kuralını bir dahaki yazında bilerek kullan."],
+      actions:`<a class="btn" href="#pratik/yaz">Yazmaya başla</a>`};
+  }
+  if(kind==="speaking"){
+    const w = workOf("speaking");
+    return {kind, icon:"🗣️", title:"Konuşma", min:15, tag:LV[w],
+      steps:["Pratik → Konuş'ta 5 cümle shadowing yap: dinle, aynı ritimle tekrar et.","Sonra 1 dakika şu konuda konuş: <b>"+esc(pick(S_TOPICS[band(w)]))+"</b>","Konuşman yazıya dökülür; istersen Claude'a gönderip geri bildirim al.", w>=2 ? "Bonus: Claude mobil uygulamasında sesli sohbet (hazır komut aşağıda)." : "Utanmak çok normal. Kimse duymuyor; sadece sen ve telefon."],
+      actions:`<a class="btn" href="#pratik/konus">Konuşmaya başla</a>${w>=2?`<button class="btn ghost" data-act="chat" data-lv="${LV[w]}">Sesli sohbet komutu</button>`:""}`};
+  }
+  if(kind==="fun"){
+    const w = workOf("listening");
+    return {kind, icon:"🍿", title:"Keyif günü", min:20, tag:"serbest",
+      steps:[w<=1 ? "Bildiğin bir diziyi/filmi İngilizce ses ve Türkçe altyazıyla izle." : w===2 ? "Bir dizi bölümünü İngilizce ses ve İngilizce altyazıyla izle." : "Bir bölümü altyazısız izlemeyi dene; zorlanınca İngilizce altyazı aç.","Sevdiğin bir şarkının sözlerini İngilizce oku ve birlikte söyle.","Görev yok, test yok. Bugün İngilizceyle iyi vakit geçirmek yeter."],
+      actions:`<a class="btn ghost" href="https://www.languagereactor.com/" target="_blank" rel="noopener">Language Reactor (çift altyazı)</a>`};
+  }
+  const wk = weakest();
+  return {kind, icon:"🌿", title:"Hafif tekrar", min:10, tag:"pazar",
+    steps:["Sadece kelime kartlarını yap.","Bu haftaki yazılarına bak: 'Bu haftanın kuralı'nı hatırlıyor musun?","İstersen en zayıf becerine 5 dakika ekle: <b>"+SK[wk]+"</b>.","Ya da dinlen. Dinlenmek de planın parçası."],
+    actions:""};
+}
+function dueCards(){ const t = today(); return Object.entries(S.cards).filter(([id,c])=>c.due<=t && wordById(id)).map(([id])=>id); }
+function newPool(){
+  const max = workOf("vocab");
+  // words at the level being worked on come first, then one below, then the easy ones
+  const rank = l => l===max ? 0 : l===max-1 ? 1 : 2 + (max-l);
+  return WORDS.filter(w=>w[3]<=max && !S.cards["b:"+w[0]]).sort((a,b)=>rank(a[3])-rank(b[3])).map(w=>"b:"+w[0]);
+}
+function newLeftToday(){ return Math.max(0, S.settings.newPerDay - (S.newOn[today()]||0)); }
+function vToday(m){
+  const t = today(), dow = new Date().getDay(), d = S.done[t] || {};
+  const task = mainTask(dow);
+  const nDue = dueCards().length + Math.min(newLeftToday(), newPool().length);
+  // week dots Monday..Sunday
+  const now = new Date(t+"T12:00:00"); const mon = addDays(t, -((now.getDay()+6)%7));
+  let week = "", count = 0;
+  for(let i=0;i<7;i++){ const day = addDays(mon,i); const dd = S.done[day]||{}; const any = dd.cards||dd.main; if(any) count++;
+    week += `<div>${DOW[(i+1)%7]}<span class="${any?"done":""} ${day===t?"today":""}">${any?ICON.check:new Date(day+"T12:00:00").getDate()}</span></div>`; }
+  const missed2 = !(S.done[addDays(t,-1)]||{}).main && !(S.done[addDays(t,-1)]||{}).cards && !(S.done[addDays(t,-2)]||{}).main && !(S.done[addDays(t,-2)]||{}).cards && S.history.length && S.testDate && S.testDate < addDays(t,-1);
+  const hello = new Date().getHours()<12 ? "Günaydın" : new Date().getHours()<18 ? "İyi günler" : "İyi akşamlar";
+  m.innerHTML = `<div class="tiny">${new Date().toLocaleDateString("tr-TR",{weekday:"long",day:"numeric",month:"long"})}</div>
+  <h1>${hello}</h1>
+  <p class="sub">Bugün yaklaşık ${task.min+5} dakika. ${d.cards&&d.main?"Bugünü tamamladın, harika. 🎉":""}</p>
+  ${missed2 ? `<div class="card soft small">İki gündür ara verdin, sorun değil. Bugün sadece kartları yapsan bile zinciri yeniden başlatmış olursun.</div>`:""}
+  <div class="card"><div class="between" style="margin-bottom:10px"><h3 style="margin:0">Bu hafta</h3><span class="tag acc">${count}/6 gün</span></div><div class="week">${week}</div></div>
+  <div class="card task"><button class="tick ${d.cards?"on":""}" data-tick="cards" aria-label="Kelime kartlarını tamamlandı işaretle">${ICON.check}</button>
+    <div class="body"><div class="between"><h3>🗂️ Kelime kartları</h3><span class="tiny">5 dk</span></div>
+    <div class="small muted">${nDue ? `Bugün ${nDue} kart seni bekliyor.` : "Bugünlük kart kalmadı. 👏"}</div>
+    <div class="row" style="margin-top:10px"><a class="btn ${d.cards?"":"primary"}" href="#kelime">${nDue?"Kartlara başla":"Kartlara bak"}</a></div></div></div>
+  <div class="card task"><button class="tick ${d.main?"on":""}" data-tick="main" aria-label="Günün görevini tamamlandı işaretle">${ICON.check}</button>
+    <div class="body"><div class="between"><h3>${task.icon} ${esc(task.title)}</h3><span class="tiny">${task.min} dk · <span class="tag">${task.tag}</span></span></div>
+    <ol class="small">${task.steps.map(s=>`<li>${s}</li>`).join("")}</ol>
+    <div class="row">${task.actions}</div></div></div>
+  <div class="card"><div class="between"><div><h3 style="margin:0">Bugün hiç vaktin yok mu?</h3><div class="small muted">2 dakikalık mini versiyon: sadece 5 kart. Zinciri kırmamaya yeter.</div></div><a class="btn" href="#kelime/mini">2 dk</a></div></div>
+  <h2>Haftalık ritim</h2>
+  <div class="card small" style="padding:6px 18px">${[1,2,3,4,5,6,0].map(x=>{ const k=DAYPLAN[x]; const lab={grammar:"🧩 Gramer",reading:"📖 Okuma",listening:"🎧 Dinleme",writing:"✍️ Yazma",speaking:"🗣️ Konuşma",fun:"🍿 Keyif günü (dizi, şarkı)",review:"🌿 Hafif tekrar / dinlen"}[k];
+    return `<div class="between" style="padding:7px 0;${x!==1?"border-top:1px solid var(--line)":""}${x===dow?";font-weight:600;color:var(--accent)":""}"><span>${DOW[x]}</span><span>${lab}</span></div>`; }).join("")}</div>
+  <p class="tiny">Her gün buna ek olarak 5 dakika kelime kartı var.</p>`;
+  m.onclick = e=>{
+    const tk = e.target.closest("[data-tick]");
+    if(tk){ const k = tk.dataset.tick; S.done[t] = Object.assign({}, S.done[t]); S.done[t][k] = !S.done[t][k]; save(); vToday(m); if(S.done[t][k]) toast("Tamamlandı ✓"); return; }
+    const a = e.target.closest("[data-act]"); if(!a) return;
+    const act = a.dataset.act;
+    if(act==="gbridge") bridge("Gramer: "+a.dataset.topic, P.grammar(a.dataset.topic, a.dataset.lv));
+    if(act==="gdone"){ if(!S.grammarDone.includes(a.dataset.topic)) S.grammarDone.push(a.dataset.topic); S.done[t]=Object.assign({},S.done[t],{main:true}); save(); toast("Bir sonraki pazartesi yeni konu"); vToday(m); }
+    if(act==="rbridge") bridge("Seviyene göre okuma metni", P.reading(a.dataset.lv, pick(["bir tasarım öğrencisinin günü","sürdürülebilir ürünler","şehirde seyahat","staj mülakatı","ünlü bir tasarım nesnesinin hikâyesi","uzaktan çalışma"])));
+    if(act==="chat") bridge("Claude ile sesli sohbet", P.chat(a.dataset.lv), {tip:"Claude mobil uygulamasında yeni sohbet aç, komutu yapıştır, sonra ses moduna geç. Telefonda değilsen yazarak da olur."});
+  };
+}
+
+/* ================= CARDS ================= */
+function wordById(id){
+  if(id.startsWith("b:")){ const w = WORDS.find(x=>"b:"+x[0]===id); return w ? {en:w[0],tr:w[1],ex:w[2],lv:w[3],topic:w[4]} : null; }
+  const c = S.custom.find(x=>x.id===id); return c ? {en:c.en,tr:c.tr,ex:c.ex||"",lv:null,topic:"benim"} : null;
+}
+const INTERVALS = [0,1,3,7,16,35];
+let CS = null;
+function startSession(mini){
+  const t = today();
+  let q = dueCards();
+  const add = newPool().slice(0, newLeftToday());
+  add.forEach(id=>{ S.cards[id] = {box:0, due:t}; });
+  if(add.length){ S.newOn[t] = (S.newOn[t]||0) + add.length; save(); }
+  q = [...new Set([...q, ...add])];
+  if(mini) q = q.slice(0,5);
+  CS = {q, show:false, total:q.length, ok:0, again:new Set()};
+}
+function vCards(m, sub){
+  if(sub==="mini" && !CS){ startSession(true); if(!CS.q.length) CS = null; }
+  const counts = {learning:0, known:0}; Object.values(S.cards).forEach(c=>{ if(c.box>=4) counts.known++; else counts.learning++; });
+  if(!CS || !CS.q.length){
+    const due = dueCards().length, nw = Math.min(newLeftToday(), newPool().length);
+    const finished = CS && CS.total;
+    m.innerHTML = `<h1>Kelime</h1><p class="sub">Aralıklı tekrar: bildiğin kart giderek daha seyrek gelir, bilemediğin yarın tekrar gelir.</p>
+    ${finished ? `<div class="card soft"><h3>Bitti 🎉</h3><div class="small">${CS.total} kart çalıştın. Yarın kaldığın yerden devam.</div></div>` : ""}
+    <div class="grid2" style="margin-bottom:12px"><div class="stat"><b>${due+nw}</b><span>bugün bekleyen</span></div><div class="stat"><b>${counts.known}</b><span>iyi bildiğin kelime</span></div></div>
+    ${due+nw ? `<button class="btn primary block" data-start>Başla (${due+nw} kart)</button>` : `<div class="card small muted">Bugünlük kart yok. İstersen kendi kelimeni ekle ya da yarın gel.</div>`}
+    <h2>Kendi kelimeni ekle</h2>
+    <div class="card stack"><p class="small muted" style="margin:0">Okurken, dinlerken ya da dizide karşına çıkan kelimeler. En kalıcı olanlar bunlar.</p>
+     <input class="f" id="nen" placeholder="İngilizce (örn. lightweight)" lang="en" autocapitalize="off">
+     <input class="f" id="ntr" placeholder="Türkçe anlamı (örn. hafif)">
+     <input class="f" id="nex" placeholder="Örnek cümle (isteğe bağlı)" lang="en">
+     <button class="btn" id="nadd">Kartlara ekle</button></div>
+    <h2>Ayar</h2>
+    <div class="card between"><span>Günde yeni kelime</span><div class="row">${[3,5,8,12].map(n=>`<button class="chip" data-np="${n}" aria-pressed="${S.settings.newPerDay===n}">${n}</button>`).join("")}</div></div>
+    <p class="tiny">Hazır destede ${WORDS.length} kelime var (okul/tasarım, iş, seyahat, günlük hayat). Seviyene kadar olanlar açılır. ${counts.learning} kelime öğrenme aşamasında.</p>`;
+    m.onclick = e=>{
+      if(e.target.closest("[data-start]")){ startSession(false); vCards(m); return; }
+      const np = e.target.closest("[data-np]"); if(np){ S.settings.newPerDay = +np.dataset.np; save(); vCards(m); return; }
+      if(e.target.id==="nadd"){ const en=$("#nen").value.trim(), tr=$("#ntr").value.trim(); if(!en||!tr){ toast("İngilizce ve Türkçe alanlarını doldur"); return; }
+        const id = "u:"+Date.now(); S.custom.push({id,en,tr,ex:$("#nex").value.trim()}); S.cards[id] = {box:0, due:today()}; save(); toast("Eklendi, bugün karşına çıkacak"); vCards(m); }
+    };
+    return;
+  }
+  const id = CS.q[0], w = wordById(id);
+  const done = CS.total - CS.q.length;
+  m.innerHTML = `<div class="between"><button class="btn ghost" data-end>Bitir</button><span class="tiny">${done} / ${CS.total}</span></div>
+  <div class="progress"><i style="width:${Math.round(100*done/CS.total)}%"></i></div>
+  <div class="flash"><div class="w" lang="en">${esc(w.en)}</div>${w.ex?`<div class="ex" lang="en">${esc(w.ex)}</div>`:""}
+   <div class="row" style="justify-content:center">${playBtn(w.ex ? w.en+". "+w.ex : w.en)}</div>
+   ${CS.show ? `<div class="tr">${esc(w.tr)}</div>` : ""}
+   ${w.topic?`<div><span class="tag">${esc(w.topic)}</span></div>`:""}</div>
+  <div style="margin-top:14px">${CS.show
+    ? `<div class="grid2"><button class="btn block" data-r="0">Bilemedim</button><button class="btn primary block" data-r="1">Bildim</button></div>`
+    : `<button class="btn primary block" data-show>Anlamını göster</button><p class="tiny" style="text-align:center">Önce kafanda cevapla, sonra kontrol et.</p>`}</div>`;
+  setTimeout(()=>speak(w.en), 200);
+  m.onclick = e=>{
+    if(e.target.closest("[data-end]")){ CS = null; vCards(m); return; }
+    if(e.target.closest("[data-show]")){ CS.show = true; vCards(m); return; }
+    const r = e.target.closest("[data-r]"); if(!r) return;
+    const c = S.cards[id] || {box:0,due:today()};
+    if(r.dataset.r==="1"){ if(!CS.again.has(id)){ c.box = Math.min(5, c.box+1); } c.due = addDays(today(), INTERVALS[Math.max(1,c.box)]); CS.q.shift(); CS.ok++; }
+    else { c.box = 0; c.due = today(); CS.again.add(id); CS.q.push(CS.q.shift()); }
+    S.cards[id] = c; CS.show = false;
+    if(!CS.q.length){ S.done[today()] = Object.assign({}, S.done[today()], {cards:true}); toast("Kartlar tamam ✓"); }
+    save(); vCards(m);
+  };
+}
+
+/* ================= PRACTICE ================= */
+let REC = null;
+function stopRec(){ if(REC){ try{ REC.onend=null; REC.stop(); }catch(e){} REC=null; } }
+function listen(onText, onEnd, continuous){
+  if(!SR){ toast("Bu tarayıcı konuşmayı yazıya çeviremiyor. Chrome, Edge ya da Safari dene."); return null; }
+  stopRec();
+  const r = new SR(); r.lang = "en-US"; r.interimResults = true; r.continuous = !!continuous;
+  let finalText = "";
+  r.onresult = ev=>{ let interim=""; for(let i=ev.resultIndex;i<ev.results.length;i++){ const t=ev.results[i][0].transcript; if(ev.results[i].isFinal) finalText += t+" "; else interim += t; } onText((finalText+interim).trim(), false); };
+  r.onerror = ev=>{ if(ev.error==="not-allowed") toast("Mikrofon izni gerekiyor."); };
+  r.onend = ()=>{ REC=null; onEnd(finalText.trim()); };
+  r.start(); REC = r; return r;
+}
+function vPractice(m, sub){
+  sub = sub || "yaz";
+  const seg = `<div class="seg" role="tablist">${[["yaz","Yaz"],["konus","Konuş"],["dinle","Dinle"]].map(([k,l])=>`<button role="tab" aria-selected="${k===sub}" data-sub="${k}">${l}</button>`).join("")}</div>`;
+  m.innerHTML = `<h1>Pratik</h1>` + seg + `<div id="pbody"></div>`;
+  m.querySelector(".seg").onclick = e=>{ const b=e.target.closest("[data-sub]"); if(b) location.hash = "#pratik/"+b.dataset.sub; };
+  const body = $("#pbody");
+  ({yaz:pWrite, konus:pSpeak, dinle:pListen}[sub] || pWrite)(body);
+}
+function pWrite(el){
+  const w = workOf("writing"), prompts = W_PROMPTS[band(w)];
+  let pi = dayNo() % prompts.length;
+  const draw = ()=>{
+    const draft = (()=>{ try{ return localStorage.getItem(KEY+":draft")||""; }catch(e){ return ""; } })();
+    el.innerHTML = `<div class="card"><div class="between"><span class="tag acc">Seviye ${LV[w]}</span><button class="btn ghost small" data-np>Başka konu</button></div>
+      <h3 style="margin-top:8px">${esc(prompts[pi])}</h3>
+      <textarea id="wt" rows="8" lang="en" spellcheck="false" placeholder="Doğrudan İngilizce yaz. Kelime bilmiyorsan (Türkçesini parantez içinde) yaz, sorun değil.">${esc(draft)}</textarea>
+      <div class="between" style="margin-top:8px"><span class="tiny" id="wc">0 kelime</span><div class="row"><button class="btn" data-save>Kaydet</button><button class="btn primary" data-fb>Claude'a düzelttir</button></div></div></div>
+      <p class="tiny">Yazım denetimi kapalı: kendi hatalarını görebilmen için. Claude metnini baştan yazmaz, hatalarını ve bir kural gösterir.</p>
+      <h2>Yazılarım</h2>
+      <div class="card" style="padding:4px 18px">${S.journal.length ? S.journal.slice().reverse().map(j=>`<details class="entry"><summary><b>${esc(j.date)}</b> · <span class="muted small">${esc(j.prompt)}</span></summary><pre lang="en">${esc(j.text)}</pre>${j.fb?`<hr><div class="tiny">Claude'un geri bildirimi</div><pre>${esc(j.fb)}</pre>`:""}</details>`).join("") : `<p class="small muted">Henüz yazı yok. İlki en zoru; 3 cümle bile yeter.</p>`}</div>`;
+    const ta = $("#wt"), wc = $("#wc");
+    const upd = ()=>{ wc.textContent = (ta.value.trim().split(/\s+/).filter(Boolean).length)+" kelime"; try{ localStorage.setItem(KEY+":draft", ta.value); }catch(e){} };
+    ta.oninput = upd; upd();
+    const store = ()=>{ const text = ta.value.trim(); if(!text){ toast("Önce bir şeyler yaz"); return null; }
+      const j = {id:Date.now(), date:today(), prompt:prompts[pi], text, kind:"yazma"}; S.journal.push(j);
+      S.done[today()] = Object.assign({}, S.done[today()], DAYPLAN[new Date().getDay()]==="writing" ? {main:true} : {});
+      save(); try{ localStorage.removeItem(KEY+":draft"); }catch(e){} return j; };
+    el.onclick = e=>{
+      if(e.target.closest("[data-np]")){ pi = (pi+1) % prompts.length; draw(); return; }
+      if(e.target.closest("[data-save]")){ if(store()){ toast("Kaydedildi"); draw(); } return; }
+      if(e.target.closest("[data-fb]")){ const j = store(); if(!j) return; draw();
+        bridge("Yazını Claude'a düzelttir", P.writing(j.prompt, LV[w], j.text), {save:v=>{ const x=S.journal.find(y=>y.id===j.id); if(x){ x.fb=v; save(); draw(); } }}); }
+    };
+  };
+  draw();
+}
+function pSpeak(el){
+  const w = workOf("speaking"), b = band(w), sents = SENT[w];
+  let si = 0; const topics = S_TOPICS[b]; let ti = dayNo() % topics.length;
+  const draw = ()=>{
+    el.innerHTML = `<div class="card"><div class="between"><h3 style="margin:0">1 · Shadowing</h3><span class="tag acc">${LV[w]} · ${si+1}/${sents.length}</span></div>
+      <p class="small muted" style="margin:6px 0 12px">Dinle, sonra mikrofona bas ve aynı ritim ve tonlamayla tekrar et. Telaffuz ve akıcılık için en etkili egzersiz.</p>
+      <div class="passage" lang="en" style="font-size:19px">${esc(sents[si])}</div>
+      <div class="row">${playBtn(sents[si])}</div>
+      <button class="rec" id="sh" aria-label="Kaydet">${ICON.mic}</button>
+      <div id="shout" class="diff small" style="text-align:center;min-height:24px"></div>
+      <div class="between" style="margin-top:8px"><button class="btn ghost" data-prev ${si?"":"disabled"}>‹ Önceki</button><button class="btn" data-nexts>Sonraki ›</button></div></div>
+     <div class="card"><h3>2 · Bir dakika konuş</h3>
+      <div class="between"><b style="font-size:17px">${esc(topics[ti])}</b><button class="btn ghost small" data-nt>Başka konu</button></div>
+      <p class="small muted" style="margin:6px 0">Mikrofona bas, durmadan 1 dakika konuş. Takılırsan "umm" de ve devam et; mükemmel olması gerekmiyor.</p>
+      <button class="rec" id="fr" aria-label="Konuşmayı kaydet">${ICON.mic}</button>
+      <div class="tiny" id="frt" style="text-align:center"></div>
+      <textarea id="frtx" rows="4" lang="en" placeholder="Konuşman burada yazıya dökülecek. İstersen düzeltebilirsin."></textarea>
+      <div class="row" style="margin-top:8px"><button class="btn primary" data-sfb>Claude'dan geri bildirim al</button></div></div>
+     ${w>=1 ? `<div class="card"><h3>3 · Claude ile sesli sohbet</h3><p class="small muted" style="margin:0 0 10px">Claude mobil uygulamasında ses moduyla gerçek bir sohbet. Komut, Claude'un seviyene göre konuşmasını ve hatalarını sonda toplamasını sağlar.</p><button class="btn" data-chat>Sohbet komutunu al</button></div>`:""}
+     ${SR ? "" : `<p class="tiny">Not: Bu tarayıcı konuşmayı yazıya çeviremiyor. Chrome, Edge ya da iPhone'da Safari dene.</p>`}`;
+    const shBtn = $("#sh"), out = $("#shout");
+    shBtn.onclick = ()=>{
+      if(REC){ stopRec(); return; }
+      shBtn.classList.add("live"); shBtn.innerHTML = ICON.stop; out.textContent = "Dinliyorum…";
+      listen(t=>{ out.textContent = t; }, said=>{ shBtn.classList.remove("live"); shBtn.innerHTML = ICON.mic;
+        if(!said){ out.textContent = "Ses duyamadım, tekrar dene."; return; }
+        const c = compare(sents[si], said);
+        out.innerHTML = `<div style="margin-bottom:4px"><b>%${c.pct}</b> ${c.pct>=90?"Harika! 🎉":c.pct>=70?"Çok iyi, bir kez daha?":"Altı çizili kelimeleri yavaş dinleyip tekrar dene."}</div><div lang="en">${c.html}</div><div class="tiny">Duyulan: "${esc(said)}"</div>`; }, false);
+    };
+    const frBtn = $("#fr"), frt = $("#frt"), frtx = $("#frtx"); let timer = null;
+    frBtn.onclick = ()=>{
+      if(REC){ stopRec(); return; }
+      const base = frtx.value.trim(); let sec = 0;
+      frBtn.classList.add("live"); frBtn.innerHTML = ICON.stop; frt.textContent = "0 sn";
+      timer = setInterval(()=>{ sec++; frt.textContent = sec+" sn"+(sec>=60?" · 1 dakika oldu! 🎉":""); }, 1000);
+      listen(t=>{ frtx.value = (base?base+" ":"")+t; }, said=>{ clearInterval(timer); frBtn.classList.remove("live"); frBtn.innerHTML = ICON.mic; if(said) frtx.value = (base?base+" ":"")+said; }, true);
+    };
+    el.onclick = e=>{
+      if(e.target.closest("[data-prev]")){ stopRec(); si = Math.max(0,si-1); draw(); }
+      else if(e.target.closest("[data-nexts]")){ stopRec(); si = (si+1) % sents.length; if(si===0) toast("Tur tamam! Baştan bir tur daha?"); draw(); }
+      else if(e.target.closest("[data-nt]")){ stopRec(); ti = (ti+1) % topics.length; draw(); }
+      else if(e.target.closest("[data-chat]")) bridge("Claude ile sesli sohbet", P.chat(LV[w]), {tip:"Claude mobil uygulamasında yeni sohbet aç, komutu yapıştır, sonra ses moduna geç."});
+      else if(e.target.closest("[data-sfb]")){ const t = frtx.value.trim(); if(!t){ toast("Önce konuş ya da yaz"); return; }
+        const j = {id:Date.now(), date:today(), prompt:"Konuşma: "+topics[ti], text:t, kind:"konuşma"}; S.journal.push(j);
+        if(DAYPLAN[new Date().getDay()]==="speaking") S.done[today()] = Object.assign({}, S.done[today()], {main:true});
+        save(); bridge("Konuşmana geri bildirim", P.speaking(topics[ti], LV[w], t), {save:v=>{ const x=S.journal.find(y=>y.id===j.id); if(x){ x.fb=v; save(); } }}); }
+    };
+  };
+  draw();
+}
+function pListen(el){
+  const w = workOf("listening");
+  const pool = [...SENT[w], ...(w>0?SENT[w-1]:[])];
+  let i = 0, order = pool.map((_,k)=>k).sort(()=>Math.random()-.5).slice(0,5), score = [];
+  const draw = ()=>{
+    if(i>=order.length){
+      const avg = Math.round(score.reduce((a,b)=>a+b,0)/score.length);
+      el.innerHTML = `<div class="card soft"><h3>Dikte bitti 🎧</h3><p class="small" style="margin:0">Ortalama doğruluk: <b>%${avg}</b>. ${avg>=85?"Kulakların iyi çalışıyor!":"Kaçırdığın kelimeler genelde kısa, vurgusuz kelimeler (a, the, to, have). Bu çok normal; dinledikçe oturur."}</p></div>
+      <button class="btn primary block" data-again>Yeni 5 cümle</button>`;
+      if(DAYPLAN[new Date().getDay()]==="listening" && band(w)==="low"){ S.done[today()] = Object.assign({}, S.done[today()], {main:true}); save(); }
+      el.onclick = e=>{ if(e.target.closest("[data-again]")){ i=0; score=[]; order = pool.map((_,k)=>k).sort(()=>Math.random()-.5).slice(0,5); draw(); } };
+      return;
+    }
+    const s = pool[order[i]];
+    el.innerHTML = `<div class="card"><div class="between"><h3 style="margin:0">Dikte</h3><span class="tag acc">${LV[w]} · ${i+1}/${order.length}</span></div>
+      <p class="small muted" style="margin:6px 0 12px">Cümleyi dinle ve duyduğun gibi yaz. İstediğin kadar tekrar dinle.</p>
+      <div class="row">${playBtn(s, "Cümleyi dinle")}</div>
+      <textarea id="dt" rows="3" lang="en" spellcheck="false" autocapitalize="off" style="margin-top:12px" placeholder="Duyduğunu yaz…"></textarea>
+      <div id="dres" class="diff" style="margin-top:10px"></div>
+      <div class="row" style="margin-top:10px"><button class="btn primary" data-chk>Kontrol et</button></div></div>
+      <div class="card small muted">İpucu: Önce tüm cümleyi bir kez dinle, sonra parça parça yaz. Emin olmadığın yere tahmin yaz; boş bırakmaktan iyidir.</div>`;
+    setTimeout(()=>speak(s), 300);
+    el.onclick = e=>{
+      const b = e.target.closest("[data-chk],[data-nx]"); if(!b) return;
+      if(b.hasAttribute("data-nx")){ i++; draw(); return; }
+      const c = compare(s, $("#dt").value); score.push(c.pct);
+      $("#dres").innerHTML = `<div class="small"><b>%${c.pct}</b></div><div lang="en" style="font-size:17px">${c.html}</div>`;
+      b.outerHTML = `<button class="btn primary" data-nx>Sonraki ›</button>`;
+    };
+  };
+  draw();
+}
+
+/* ================= RESOURCES ================= */
+let RF = {mine:true, skill:"all"};
+function vRes(m){
+  const ov = overall(), w = Math.min(4, ov+1);
+  const list = RES.filter(r=> (!RF.mine || (w>=r.lv[0] && w<=r.lv[1])) && (RF.skill==="all" || r.s.includes(RF.skill) || (RF.skill==="exam" && r.k==="Sınav")));
+  m.innerHTML = `<h1>Kaynaklar</h1><p class="sub">Hepsini yapmana gerek yok. Planın zaten bunlardan seçiyor; burası merak ettiğinde bakacağın raf.</p>
+  <div class="row" style="margin-bottom:8px"><button class="chip" data-mine aria-pressed="${RF.mine}">Seviyeme uygun (${LV[w]})</button></div>
+  <div class="row" style="margin-bottom:16px">${[["all","Hepsi"],...Object.entries(SK),["exam","Sınav"]].map(([k,l])=>`<button class="chip" data-sk="${k}" aria-pressed="${RF.skill===k}">${l}</button>`).join("")}</div>
+  ${list.map(r=>`<div class="card res"><div class="ico">${r.i}</div><div style="flex:1;min-width:0">
+    <div class="between" style="align-items:flex-start"><h3 style="margin:0">${r.u?`<a href="${r.u}" target="_blank" rel="noopener" style="color:inherit">${esc(r.n)}</a>`:esc(r.n)}</h3></div>
+    <div class="row" style="gap:6px;margin-top:4px"><span class="tag">${esc(r.k)}</span><span class="tag">${LV[r.lv[0]]}–${LV[r.lv[1]]}</span>${r.f?`<span class="tag ok">Ücretsiz</span>`:""}</div>
+    <p>${esc(r.d)}</p></div></div>`).join("") || `<div class="card small muted">Bu filtreyle kaynak yok.</div>`}
+  <h2>Sınav hedefin varsa</h2>
+  <div class="card small"><p style="margin:0 0 8px"><b>Önce B1'e kadar genel İngilizce.</b> Sınav tekniği, temel oturmadan işe yaramaz; planı izlemen sınava da hazırlık.</p>
+  <p style="margin:0 0 8px"><b>Hangi sınav?</b> Yurtdışı yüksek lisans/değişim → IELTS (ya da ABD için TOEFL). Türkiye'de akademik/kamu → YDS/YÖKDİL.</p>
+  <p style="margin:0">B1'e geldiğinde sınavın deneme testlerini haftada bir, Cumartesi keyif günü yerine ekleyebilirsin.</p></div>`;
+  m.onclick = e=>{
+    if(e.target.closest("[data-mine]")){ RF.mine = !RF.mine; vRes(m); return; }
+    const s = e.target.closest("[data-sk]"); if(s){ RF.skill = s.dataset.sk; vRes(m); }
+  };
+}
+
+/* ================= ME / LEVELS ================= */
+function vMe(m){
+  const days = Object.values(S.done).filter(d=>d.cards||d.main).length;
+  const known = Object.values(S.cards).filter(c=>c.box>=4).length;
+  const since = S.testDate ? Math.floor((new Date(today())-new Date(S.testDate))/864e5) : null;
+  m.innerHTML = `<h1>Seviyem</h1><p class="sub">${S.testDate ? `Son ölçüm: ${new Date(S.testDate+"T12:00:00").toLocaleDateString("tr-TR",{day:"numeric",month:"long",year:"numeric"})}` : "Henüz seviye testi yapmadın."}</p>
+  <div class="card">${levelRows()}<div class="tiny" style="margin-top:8px">Dolu: geçtiğin seviye · Çizgili: çalıştığın seviye</div></div>
+  ${since!==null && since>=42 ? `<div class="card soft small">İlk ölçümden bu yana ${Math.floor(since/7)} hafta geçti. Testi tekrarlayıp ilerlemeni görmenin zamanı.</div>`:""}
+  <a class="btn ${S.testDate?"":"primary"} block" href="#test">${S.testDate?"Seviye testini tekrarla":"Seviye testine başla"}</a>
+  <h2>İlerleme</h2>
+  <div class="grid2"><div class="stat"><b>${days}</b><span>çalıştığın gün</span></div><div class="stat"><b>${known}</b><span>iyi bildiğin kelime</span></div>
+  <div class="stat"><b>${S.journal.length}</b><span>yazı ve konuşma</span></div><div class="stat"><b>${S.grammarDone.length}</b><span>gramer konusu</span></div></div>
+  ${S.history.length>1 ? `<h2>Ölçüm geçmişi</h2><div class="card small" style="padding:6px 18px">${S.history.slice().reverse().map(h=>`<div class="between" style="padding:7px 0;border-top:1px solid var(--line)"><span>${esc(h.date)}</span><span class="muted">${Object.keys(SK).map(k=>SK[k].slice(0,3)+" "+lvName(h.levels[k])).join(" · ")}</span></div>`).join("")}</div>`:""}
+  <h2>Seviyeler ne demek?</h2>
+  <div class="card small" style="padding:6px 18px">
+   ${[["A1","Temel kalıplar: kendini tanıtmak, basit sorular."],["A2","Günlük işleri halletmek: alışveriş, yol, kısa mesajlar."],["B1","Seyahatte rahat, deneyim anlatabilen, bağımsız kullanıcı. Çoğu staj ve değişim programı en az bunu ister."],["B2","Akıcı sohbet, fikir savunma, iş ve okulda rahat çalışma. Yurtdışı yüksek lisans genelde B2–C1 (IELTS 6.5 civarı) ister."],["C1","İncelikli, akademik ve profesyonel kullanım."]].map(([a,b],i)=>`<div style="padding:8px 0;${i?"border-top:1px solid var(--line)":""}"><b>${a}</b> <span class="muted">${b}</span></div>`).join("")}</div>
+  <p class="tiny">Kabaca bir sonraki seviyeye geçmek, günde 15–20 dakikayla 4–6 ay sürer. Başlangıç seviyeleri daha hızlı geçer.</p>
+  <h2>Verilerim</h2>
+  <div class="card stack"><p class="small muted" style="margin:0">Her şey sadece bu cihazda, tarayıcıda saklanıyor. Telefon değiştirirken ya da ara sıra yedek al.</p>
+   <div class="row"><button class="btn" data-exp>Yedeği indir</button><label class="btn">Yedekten yükle<input type="file" accept="application/json" data-imp hidden></label></div>
+   <div class="row"><span class="small">Görünüm</span>${[["","Otomatik"],["light","Açık"],["dark","Koyu"]].map(([k,l])=>`<button class="chip" data-th="${k}" aria-pressed="${(S.settings.theme||"")===k}">${l}</button>`).join("")}</div>
+   <div class="row"><span class="small">Konuşma hızı</span>${[[0.8,"Yavaş"],[0.9,"Normal"],[1,"Doğal"]].map(([k,l])=>`<button class="chip" data-rate="${k}" aria-pressed="${S.settings.rate===k}">${l}</button>`).join("")}</div>
+   <button class="btn ghost" data-reset style="color:var(--warn)">Her şeyi sıfırla</button></div>`;
+  m.onclick = e=>{
+    if(e.target.closest("[data-exp]")){ const b = new Blob([JSON.stringify(S,null,1)],{type:"application/json"}); const a=document.createElement("a"); a.href=URL.createObjectURL(b); a.download="ingilizce-yedek-"+today()+".json"; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); return; }
+    const th = e.target.closest("[data-th]"); if(th){ S.settings.theme = th.dataset.th; save(); applyTheme(); vMe(m); return; }
+    const rt = e.target.closest("[data-rate]"); if(rt){ S.settings.rate = +rt.dataset.rate; save(); speak("This is how fast I will speak."); vMe(m); return; }
+    if(e.target.closest("[data-reset]")){ if(confirm("Tüm ilerleme, kartlar ve yazılar silinecek. Emin misin? (Önce yedek almanı öneririm.)")){ S = fresh(); save(); location.hash="#bugun"; render(); } }
+  };
+  m.querySelector("[data-imp]").onchange = ev=>{ const f = ev.target.files[0]; if(!f) return; f.text().then(t=>{ try{ const d = JSON.parse(t); if(!d || d.v!==1) throw 0; S = Object.assign(fresh(), d); save(); applyTheme(); toast("Yedek yüklendi"); render(); }catch(err){ toast("Bu dosya bir yedek değil gibi"); } }); };
+}
+function applyTheme(){ const t = S.settings.theme; if(t) document.documentElement.setAttribute("data-theme", t); else document.documentElement.removeAttribute("data-theme"); }
+
+/* ================= BOOT ================= */
+applyTheme();
+render();
+if("serviceWorker" in navigator && location.protocol==="https:") navigator.serviceWorker.register("sw.js").catch(()=>{});
+</script>
+</body>
+</html>
