@@ -1342,6 +1342,16 @@ function todaySteps(){
     if(k==="fun") s = {n:"Keyifli kapanış", ic:"🎲", d:"Zar at ya da hata defterine bugünkü 1 hatanı yaz", href:"#adim/fun", manual:1,
       how:["Oyun sayfasında zar at: çıkan küçük görevi yap.","Ya da bugün yaptığın 1 hatayı Oyun › Hata defterine yaz (5 hata = +10 XP)."], btns:[["🎮 Oyunu aç", "#oyun"]]};
     if(!s) return;
+    // one plain line: exactly what you do in this step (shown under every row of the plan)
+    const TODO = {
+      cards: ()=> nCards ? "Kelimeyi gör → anlamını içinden söyle → “Anlamını göster” → “Bildim” ya da “Bilemedim”." : "",
+      gram: ()=> d.gplan==="rev" ? "8 soruluk karışık tekrar; yanlışlar sonda bir kez daha gelir." : L ? `Dersi baştan oku, örnekleri dinle → ${L.q.length} soruluk alıştırmayı çöz (%70 ile geçersin).` : "",
+      gramx: ()=> "Her soruya cevabını yaz → “Kontrol et”. Yanlış = bilgi, doğrusunu gösteririm.",
+      write: ()=> "Örnek cümleyi değiştir → Türkçeden çevir → kendi hayatından bir cümle yaz.",
+      read: ()=> s.item ? "" : s.href.includes("/oku/k") || s.href.includes("/oku/u") ? "Oku (istersen sesli dinle) → alttaki soruları çöz → “Kontrol et”." : "Oku, bilmediğin en fazla 5 kelimeye dokun → alttaki “Bitti ✓”."
+    };
+    TODO.read2 = TODO.read;
+    s.todo = (TODO[k] && TODO[k]()) || (s.how ? s.how[0].replace(/<[^>]+>/g, "") : "");
     s.k = k; s.min = min; s.blk = blk || 0;
     if(s.item && !s.done) s.done = stepGet(k) || !!(g.done[s.item.k] && g.done[s.item.k].d===today());
     if(s.done==null) s.done = stepGet(k);
@@ -1402,37 +1412,62 @@ function vStep(m, k){
     ${s.how ? `<div class="card"><div class="tiny">NASIL YAPACAKSIN</div><ol class="small" style="margin:6px 0 0;padding-left:20px;line-height:1.6">${s.how.map(h=>`<li>${h}</li>`).join("")}</ol></div>` : ""}
     ${s.btns ? `<div class="stack">${s.btns.map(([l,h,ext])=>`<a class="btn ${ext?"":"primary"} block" href="${h}"${ext?' target="_blank" rel="noopener"':""}>${esc(l)}</a>`).join("")}</div>` : ""}
     ${s.alt ? `<p class="small muted">${esc(s.alt)}</p>` : ""}
-    ${s.item ? (()=>{ const ph = (fd().ph||{})[k] || 0, ck = (fd().chk||{})[k];
-      return `<div class="card"><div class="tiny">📸 KONTROL VE KANIT</div>
-      <ol class="small" style="margin:6px 0 10px;padding-left:20px;line-height:1.6"><li>Kitap ekrandaysa çözdüğün sayfanın <b>ekran görüntüsünü</b> al (bilgisayarda <b>Win+Shift+S</b>, sonra bu sayfada <b>Ctrl+V</b>; telefonda ekran görüntüsünü aşağıdaki düğmeyle seç). Kâğıttaysa fotoğrafını çek. Görsel eklenince adım kendiliğinden işaretlenir.</li><li>“Kontrol ettir”e dokun: hazır komutu Claude'a ya da ChatGPT'ye yapıştır, <b>aynı görselleri de sohbete ekle</b>.</li><li>İstersen gelen cevabı buraya kaydet; hatalarını sonra yine görürsün.</li></ol>
-      <label class="btn block" style="cursor:pointer">🖼️ Ekran görüntüsü / fotoğraf ekle${ph ? ` (${ph} eklendi)` : ""}<input type="file" accept="image/*" multiple data-photo hidden></label>
-      <div id="phs" class="row" style="gap:6px;margin-top:8px"></div>
-      <button class="btn primary block" data-check style="margin-top:8px">🧑‍🏫 Kontrol ettir (Claude / ChatGPT)</button>
-      ${ck ? `<details style="margin-top:8px"><summary class="small"><b>Kaydedilen kontrol sonucu</b></summary><div class="small" style="white-space:pre-wrap;margin-top:6px">${esc(ck)}</div></details>` : ""}
-      <p class="tiny" style="margin:8px 0 0">Görseller sadece bu cihazda kalır; Drive'a gitmez.</p></div>`; })() : ""}
+    ${s.item ? proofHTML(k) : ""}
     <button class="btn primary block" data-sdone style="margin-top:14px">${s.brk ? "Molayı bitir, devam et →" : s.done ? "✓ Yapıldı · sıradakine geç →" : "Bitti ✓ · sıradakine geç"}</button>
     ${s.done || s.brk ? "" : `<p class="tiny" style="text-align:center;margin-top:8px"><a href="#" data-sskip style="color:inherit">Bugün bunu atla (sorun değil)</a></p>`}`;
   if(s.brk){ const end = Date.now() + s.brk*60000; clearInterval(BT);
     BT = setInterval(()=>{ const el = document.getElementById("brkT"); if(!el){ clearInterval(BT); return; } const r = Math.max(0, end-Date.now());
       el.textContent = Math.floor(r/60000) + ":" + String(Math.floor(r/1000)%60).padStart(2,"0"); if(!r){ clearInterval(BT); flowNext(m, k); } }, 1000); }
-  if(s.item){
-    const d = fd(), n = (d.ph||{})[k] || 0;
-    (async ()=>{ for(let j=0;j<n;j++){ const u = await idbGet(`ph:${today()}:${k}:${j}`).catch(()=>null), box = $("#phs"); if(u && box) box.insertAdjacentHTML("beforeend", `<img src="${u}" alt="Sayfa fotoğrafı ${j+1}" style="width:72px;height:96px;object-fit:cover;border-radius:8px;border:1px solid var(--line)">`); } })();
-    const inp = m.querySelector("[data-photo]");
-    const add = async files=>{ files = files.filter(f=>/^image\//.test(f.type)); if(!files.length) return;
-      for(const f of files){ const url = await shrinkImg(f); const dd = fd(); dd.ph = dd.ph || {}; const j = dd.ph[k] || 0; await idbPut(`ph:${today()}:${k}:${j}`, url); dd.ph[k] = j+1; }
-      if(!stepGet(k) && !s.done) markStep(k, true); else save();
-      toast(`📷 ${files.length} görsel eklendi · adım işaretlendi ✓`); if(location.hash==="#adim/"+k) vStep(m, k); };
-    inp.onchange = ()=>add([...inp.files]);
-    // screenshot pasted with Ctrl+V (Win+Shift+S / Cmd+Shift+4 copies it), only while this step page is open
-    document.onpaste = e=>{ if(location.hash!=="#adim/"+k){ document.onpaste = null; return; } const fs = [...((e.clipboardData||{}).files||[])]; if(fs.length){ e.preventDefault(); add(fs); } };
-  }
+  if(s.item) proofBind(m, k, ()=>s.item.l, ()=>{ if(!stepGet(k) && !s.done) markStep(k, true); }, ()=>vStep(m, k));
   m.onclick = e=>{
-    if(e.target.closest("[data-check]")){ const x = s.item, lvl = LV[Math.max(0, Math.min(4, workOf("grammar")))];
-      bridge("Kitap sayfamı kontrol et", `Ben Türkçe konuşan, İngilizce seviyesi yaklaşık ${lvl} olan bir öğrenciyim. Ekteki görseller (ekran görüntüsü ya da fotoğraf) bugün kitaptan çözdüğüm sayfalar: "${x.l}".\n\n1. Önce neyi doğru yaptığımı kısaca söyle.\n2. Yanlışlarımı tek tek göster: soru numarası, benim cevabım, doğrusu ve nedeni (Türkçe, tek cümle). En fazla 5 tanesini ayrıntılı anlat, kalanları sadece listele.\n3. Boş bıraktığım yer varsa önce ipucu ver, cevabı hemen söyleme.\n4. Sonunda doğru sayımı "x/y doğru" diye yaz ve aynı konudan bana 3 yeni benzer soru sor.\n\nGörselde okuyamadığın bir yer varsa tahmin etme, bana söyle. Sade ve cesaretlendirici ol; hata benim için bilgi.`,
-        {tip:"Komutu yapıştırdıktan sonra sayfa görsellerini de sohbete ekle (ataş / + simgesi ya da Ctrl+V). ChatGPT'de de aynı komut çalışır.", save: v=>{ const dd = fd(); dd.chk = dd.chk || {}; dd.chk[k] = v; save(); vStep(m, k); }}); return; }
+    if(proofClick(e, k, ()=>s.item.l, ()=>vStep(m, k))) return;
     if(e.target.closest("[data-sdone]")){ clearInterval(BT); if(!flowNext(m, k)) advance(m, k); return; }
     if(e.target.closest("[data-sskip]")){ e.preventDefault(); clearInterval(BT); flowNext(m, k, "skip"); }
+  };
+}
+/* 📸 Proof box: add screenshots / photos of solved book pages, then a ready prompt to have Claude or ChatGPT check them.
+   Used on book steps and on the stand-alone #kontrol page. Images stay on this device (IndexedDB). */
+function proofHTML(key){ const ph = (fd().ph||{})[key] || 0, ck = (fd().chk||{})[key];
+  return `<div class="card"><div class="tiny">📸 SAYFANI KONTROL ETTİR</div>
+  <ol class="small" style="margin:6px 0 10px;padding-left:20px;line-height:1.6"><li><b>Telefonda:</b> kitabın çözdüğün sayfasının ekran görüntüsünü al (ya da kâğıttaysa fotoğrafını çek), sonra aşağıdaki düğmeyle seç. <b>Bilgisayarda:</b> Win+Shift+S ile al, bu sayfada Ctrl+V yap.</li><li>“Kontrol ettir”e dokun: hazır komutu Claude'a ya da ChatGPT'ye yapıştır, <b>aynı görselleri de sohbete ekle</b>.</li><li>İstersen gelen cevabı buraya kaydet.</li></ol>
+  <label class="btn block" style="cursor:pointer">🖼️ Ekran görüntüsü / fotoğraf seç${ph ? ` (${ph} eklendi)` : ""}<input type="file" accept="image/*" multiple data-photo hidden></label>
+  <div id="phs" class="row" style="gap:6px;margin-top:8px"></div>
+  <button class="btn primary block" data-check style="margin-top:8px">🧑‍🏫 Kontrol ettir (Claude / ChatGPT)</button>
+  ${ck ? `<details style="margin-top:8px"><summary class="small"><b>Kaydedilen kontrol sonucu</b></summary><div class="small" style="white-space:pre-wrap;margin-top:6px">${esc(ck)}</div></details>` : ""}
+  <p class="tiny" style="margin:8px 0 0">Görseller sadece bu cihazda kalır; Drive'a gitmez.</p></div>`; }
+function proofBind(m, key, label, onAdd, redraw){
+  const hash = location.hash, n = (fd().ph||{})[key] || 0;
+  (async ()=>{ for(let j=0;j<n;j++){ const u = await idbGet(`ph:${today()}:${key}:${j}`).catch(()=>null), box = $("#phs"); if(u && box) box.insertAdjacentHTML("beforeend", `<img src="${u}" alt="Sayfa görseli ${j+1}" style="width:72px;height:96px;object-fit:cover;border-radius:8px;border:1px solid var(--line)">`); } })();
+  const add = async files=>{ files = files.filter(f=>/^image\//.test(f.type)); if(!files.length) return;
+    for(const f of files){ const url = await shrinkImg(f); const dd = fd(); dd.ph = dd.ph || {}; const j = dd.ph[key] || 0; await idbPut(`ph:${today()}:${key}:${j}`, url); dd.ph[key] = j+1; }
+    onAdd && onAdd(); save(); toast(`📷 ${files.length} görsel eklendi ✓`); if(location.hash===hash) redraw(); };
+  const inp = m.querySelector("[data-photo]"); if(inp) inp.onchange = ()=>add([...inp.files]);
+  // a screenshot pasted with Ctrl+V (Win+Shift+S copies it), only while this page is open
+  document.onpaste = e=>{ if(location.hash!==hash){ document.onpaste = null; return; } const fs = [...((e.clipboardData||{}).files||[])]; if(fs.length){ e.preventDefault(); add(fs); } };
+}
+function proofClick(e, key, label, redraw){
+  if(!e.target.closest("[data-check]")) return false;
+  const l = label(); if(!l){ toast("Önce hangi kitap ve sayfa olduğunu yaz"); return true; }
+  const lvl = LV[Math.max(0, Math.min(4, workOf("grammar")))];
+  bridge("Kitap sayfamı kontrol et", `Ben Türkçe konuşan, İngilizce seviyesi yaklaşık ${lvl} olan bir öğrenciyim. Ekteki görseller (ekran görüntüsü ya da fotoğraf) bugün kitaptan çözdüğüm sayfalar: "${l}".\n\n1. Önce neyi doğru yaptığımı kısaca söyle.\n2. Yanlışlarımı tek tek göster: soru numarası, benim cevabım, doğrusu ve nedeni (Türkçe, tek cümle). En fazla 5 tanesini ayrıntılı anlat, kalanları sadece listele.\n3. Boş bıraktığım yer varsa önce ipucu ver, cevabı hemen söyleme.\n4. Sonunda doğru sayımı "x/y doğru" diye yaz ve aynı konudan bana 3 yeni benzer soru sor.\n\nGörselde okuyamadığın bir yer varsa tahmin etme, bana söyle. Sade ve cesaretlendirici ol; hata benim için bilgi.`,
+    {tip:"Komutu yapıştırdıktan sonra sayfa görsellerini de sohbete ekle (ataş / + simgesi). ChatGPT'de de aynı komut çalışır.", save: v=>{ const dd = fd(); dd.chk = dd.chk || {}; dd.chk[key] = v; save(); redraw(); }});
+  return true;
+}
+/* Stand-alone "I studied from a book" page: always reachable from Bugün, whatever the plan says. */
+function vKontrol(m){
+  const d = fd(), g = game(), its = weekItems(g.stage, g.week).filter(x=>/^(Takviye|Keyif|Telaffuz|Dilbilgisi|Okuma)/.test(x.l) || x.sup==="kurs").slice(0, 8);
+  m.innerHTML = `<a class="btn ghost" href="#bugun">‹ Bugün</a><h1>📸 Kitaptan çalıştım</h1>
+    <p class="sub">Planda olsun olmasın: bir kitaptan sayfa çözdüysen buraya ekle, Claude ya da ChatGPT kontrol etsin. Yaptığın kayda geçer.</p>
+    <div class="card"><div class="small" style="margin-bottom:6px"><b>1. Hangi kitap, hangi sayfa?</b></div>
+    <input id="kl" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--line);border-radius:10px;font:inherit;background:var(--bg);color:var(--ink)" placeholder="Örn: Grammar kitabı, Ünite 3, s. 18–19" value="${esc(d.kl||"")}">
+    ${its.length ? `<div class="tiny" style="margin:8px 0 4px">Bu haftanın kitap görevlerinden seç:</div><div class="row" style="gap:6px">${its.map(x=>`<button class="chip" data-kl="${esc(x.l)}" style="text-align:left">${esc(x.l.length>60 ? x.l.slice(0,58)+"…" : x.l)}</button>`).join("")}</div>` : ""}</div>
+    <div class="small" style="margin:14px 0 6px"><b>2. Görselleri ekle ve kontrol ettir</b></div>${proofHTML("kontrol")}`;
+  const lab = ()=>($("#kl").value||"").trim();
+  $("#kl").oninput = ()=>{ fd().kl = lab(); saveLocal(); };
+  proofBind(m, "kontrol", lab, ()=>{ fd().kl = lab(); const it = its.find(x=>x.l===lab()); if(it && !g.done[it.k]){ g.done[it.k] = {d:today(), xp:it.xp, l:it.l}; lvCheck(); toast(`+${it.xp} XP ✨`); } }, ()=>vKontrol(m));
+  m.onclick = e=>{
+    const c = e.target.closest("[data-kl]"); if(c){ $("#kl").value = c.dataset.kl; fd().kl = c.dataset.kl; saveLocal(); return; }
+    proofClick(e, "kontrol", lab, ()=>vKontrol(m));
   };
 }
 // photo → small JPEG data URL (≈1200px) so a page photo stays a few hundred KB on the device
@@ -2263,12 +2298,12 @@ function render(){
   stopRec(); clearTimeout(FT); FT = null; clearInterval(BT);
   const r = route();
   const inTest = r.page==="test";
-  const tab = {ben:"rehber", kaynak:"rehber", cumle:"bugun", oyun:"rehber", adim:"bugun", gx:"gramer"}[r.page] || r.page;
+  const tab = {ben:"rehber", kaynak:"rehber", cumle:"bugun", oyun:"rehber", adim:"bugun", gx:"gramer", kontrol:"bugun"}[r.page] || r.page;
   $("#tabbar").style.display = inTest || !S.onboarded ? "none" : "";
   $("#tabbar").innerHTML = `<nav>${TABS.map(t=>`<a href="#${t[0]}" ${t[0]===tab?'aria-current="page"':""}>${t[2]}${t[1]}</a>`).join("")}</nav>`;
   const m = $("#main"); m.onclick = null;
   if(!S.onboarded && !inTest){ m.innerHTML = vWelcome(); bindWelcome(); return; }
-  const V = {bugun:vToday, kelime:vCards, gramer:vGram, cumle:(m,s)=>vLadder(m,s), pratik:vPractice, rehber:vGuide, oyun:vGame, adim:vStep, gx:vGX, kaynak:vRes, ben:vMe, test:vTest, sonuc:vResult}[r.page] || vToday;
+  const V = {bugun:vToday, kelime:vCards, gramer:vGram, cumle:(m,s)=>vLadder(m,s), pratik:vPractice, rehber:vGuide, oyun:vGame, adim:vStep, gx:vGX, kontrol:vKontrol, kaynak:vRes, ben:vMe, test:vTest, sonuc:vResult}[r.page] || vToday;
   V(m, r.sub, r.arg); window.scrollTo(0,0);
   // "What's next" bar on every page: one tap back onto today's path
   const old = document.getElementById("nextbar"); if(old) old.remove();
@@ -2487,11 +2522,16 @@ function vToday(m){
     return (mo || av) && !allDone ? `<details><summary class="small muted" style="margin:0 0 10px;cursor:pointer">${mo?mo[1]:"🙂"} · ${av?av[1]:pace()+" dk"} · <u>değiştir</u></summary>${body}</details>` : allDone ? "" : body; })()}
   <div class="card" style="border:2px solid var(--accent)"><div class="between"><h3 style="margin:0">📘 Bugünkü planın</h3><span class="tag acc">${allDone?"bitti ✓":`adım ${cur+1}/${steps.length}`}</span></div>
    ${pace()>=45 && !allDone ? `<div class="small" style="margin:8px 0 2px">📕 Kitapların bugün yanında mı? <span class="row" style="display:inline-flex;gap:6px;vertical-align:middle"><button class="chip" data-books="1" aria-pressed="${booksOn()}">Evet</button><button class="chip" data-books="0" aria-pressed="${!booksOn()}">Hayır</button></span>
-     <div class="tiny" style="margin-top:2px">${booksOn() ? "Bazı adımlar kitabın belirli sayfalarına dönüştü (📕/📗 işaretli)." : "Sorun değil: her şey uygulamanın içinde. Okuma metinleri, alıştırmalar ve sorular burada."}</div></div>` : ""}
+     <div class="tiny" style="margin-top:2px">${!booksOn() ? "Sorun değil: her şey uygulamanın içinde. Okuma metinleri, alıştırmalar ve sorular burada."
+       : steps.some(s=>s.item) ? "Kitap adımları aşağıda 📕 / 📗 / 🗣️ “Kitap: …” diye yazıyor; sayfa numarası satırın içinde."
+       : !(S.pack && S.pack.game) ? `Kitap görevleri (hangi kitap, hangi sayfa) kurs paketinden gelir. Önce <a href="#kelime">Kelime › Kurs paketi yükle</a>; sonra burada görünürler.`
+       : "Bu haftanın kitap görevleri bitmiş 🎉 Oyun sayfasından sonraki haftaya geçebilirsin."}</div></div>` : ""}
+   ${(()=>{ const gs = steps.find(s=>s.k==="gram"); return gs && !allDone ? `<div class="small" style="margin:8px 0 0">🎯 Bugünün konusu: <b>${esc(gs.d)}</b>. Her satırın altındaki <b>→</b> tam olarak ne yapacağını söylüyor.</div>` : ""; })()}
    <div class="steps">${steps.map((s,i)=>`${s.blk && (i===0 || steps[i-1].blk!==s.blk) && BLK[s.blk] && steps.some(x=>x.blk>1) ? `<div class="tiny" style="margin:12px 0 0;font-weight:700;color:var(--accent)">${esc(BLK[s.blk]).toUpperCase()}</div>` : ""}<div class="sr ${i===cur?"cur":""}">
      <button class="dot ${s.done?"on":""}" data-stick="${s.k}" aria-label="${esc(s.n)}: ${s.done?"yapılmadı olarak işaretle":"yapıldı olarak işaretle"}" style="border:0;cursor:pointer;font:inherit">${s.done?ICON.check:i+1}</button>
-     <a href="${s.href}" data-step="${i}" style="flex:1;min-width:0;text-decoration:none;color:inherit;display:flex;gap:10px;align-items:center"><span style="flex:1;min-width:0"><b>${s.ic} ${esc(s.n)}</b><span class="small muted" style="display:block">${esc(s.d)}${(d.ph||{})[s.k] ? ` · 📷 ${d.ph[s.k]} fotoğraf` : ""}${(d.chk||{})[s.k] ? " · 🧑‍🏫 kontrol edildi" : ""}</span>${s.book ? `<span class="tiny" style="display:block">📕 ${esc(s.book)}</span>` : ""}</span><span class="tiny" style="flex:none">${s.min} dk ›</span></a></div>`).join("")}</div>
+     <a href="${s.href}" data-step="${i}" style="flex:1;min-width:0;text-decoration:none;color:inherit;display:flex;gap:10px;align-items:center"><span style="flex:1;min-width:0"><b>${s.ic} ${esc(s.n)}</b><span class="small muted" style="display:block">${esc(s.d)}${(d.ph||{})[s.k] ? ` · 📷 ${d.ph[s.k]} fotoğraf` : ""}${(d.chk||{})[s.k] ? " · 🧑‍🏫 kontrol edildi" : ""}</span>${s.todo && !s.done ? `<span class="tiny" style="display:block;margin-top:2px;color:var(--ink)">→ ${esc(s.todo)}</span>` : ""}${s.book ? `<span class="tiny" style="display:block">📕 ${esc(s.book)}</span>` : ""}</span><span class="tiny" style="flex:none">${s.min} dk ›</span></a></div>`).join("")}</div>
    ${!allDone ? `<p class="tiny" style="margin:6px 0 0">Daire = işaret kutusu: yaptığın bir şeyi elle işaretleyebilir ya da işareti kaldırabilirsin.</p>` : ""}
+   <a class="btn block" href="#kontrol" style="margin-top:8px">📸 Kitaptan sayfa çözdüm: ekran görüntüsü ekle ve kontrol ettir</a>
    ${allDone ? `<div class="card soft" style="margin:10px 0 0"><b>✓ Bugünlük bu kadar.</b> Artık dinlenebilirsin; yarın burası seni yine sırayla götürecek. <span class="small muted">Yarın: ${esc((nextLesson()||{}).t || "tekrar günü")}.</span>
         <div class="row" style="margin-top:8px">${(game().dice||{})[today()] ? "" : `<button class="btn sm" data-dice>🎲 İstersen zar at (keyifli kapanış)</button>`}</div></div>`
      : `<button class="btn primary block" data-flow style="margin-top:10px">${cur===0 && !steps.some(s=>s.done) ? "Başla" : "Devam et"} → ${steps[cur].ic} ${steps[cur].n}</button>
