@@ -428,12 +428,7 @@ ${text}`,
 
 Konuşmam:
 ${text}`,
-  chat:(lv)=>`Benimle İngilizce sohbet et. Seviyem yaklaşık ${lv}, Türkçe konuşan bir endüstriyel tasarım öğrencisiyim. Kurallar:
-- Benim seviyeme uygun, kısa ve net konuş; her mesajda sadece bir soru sor.
-- Konuşmayı kesip hatalarımı düzeltme; akış bozulmasın.
-- Takılırsam ipucu ver, gerekirse bir kelimeyi Türkçe söylememe izin ver.
-- Ben "bitti" deyince: en önemli 5 hatamı (yanlış → doğru, Türkçe açıklama) ve kullanabileceğim 5 yeni ifadeyi listele.
-Konu önerisi: tasarım projelerim, okul, seyahat ya da günlük hayatım. Sen başla.`,
+  chat:()=>tutorPrompt("free"),
   reading:(lv,topic)=>`Bana ${lv} seviyesinde, "${topic}" hakkında yaklaşık 180 kelimelik özgün bir İngilizce metin yaz. Sonra:
 1) 3 anlama sorusu sor (cevapları en sona "CEVAPLAR" başlığıyla yaz).
 2) Metindeki ${lv} seviyesine uygun 6 faydalı kelimeyi Türkçe anlamı ve örnek cümlesiyle listele.`,
@@ -445,6 +440,102 @@ Konu önerisi: tasarım projelerim, okul, seyahat ya da günlük hayatım. Sen b
 Metin:
 ${text}`
 };
+
+/* ================= LINGUACLAUDE (tutor prompt) ================= */
+const MODES = [
+ {k:"free", n:"Serbest sohbet", i:"💬", d:"Günlük hayat, projelerin, filmler, seyahat. Akıcılık için."},
+ {k:"role", n:"Rol yapma", i:"🎭", d:"Gerçek bir sahneyi canlandırırsınız: kafe, havalimanı, mülakat…"},
+ {k:"coach", n:"Kelime & gramer koçu", i:"🧩", d:"Kartlarındaki kelimeler ve bu haftanın gramer konusuyla mini ders ve test."},
+ {k:"exam", n:"Sınav konuşma provası", i:"🎓", d:"IELTS Speaking formatında prova, sonunda tahmini band."}
+];
+const SCENES = ["Kafede sipariş vermek","Havalimanında check-in","Otele giriş yapıp bir sorunu bildirmek","Yol sormak ve toplu taşıma","Eczanede derdini anlatmak","Değişim programında yeni biriyle tanışmak","Bir tasarım stüdyosunda staj mülakatı","Jüriye proje sunumu ve sorular","Müşteriyle tasarım toplantısı","Bir mağazada ürünü iade etmek"];
+function learningWords(n){
+  return Object.entries(S.cards).filter(([id,c])=>c.box<4).map(([id])=>wordById(id)).filter(Boolean).slice(0,n).map(w=>w.en);
+}
+function tutorBase(){
+  const sp = lvOf("speaking"), ov = overall();
+  const spName = sp<0 ? "başlangıç (A1'e çalışıyorum)" : LV[sp];
+  const ovName = ov<0 ? "başlangıç" : LV[ov];
+  const target = LV[workOf("speaking")];
+  return `Sen "LinguaClaude" adında sabırlı, sıcak ve motive edici bir İngilizce öğretmenisin. Öğrencin benim.
+
+HAKKIMDA
+- Türkçe konuşan bir endüstriyel tasarım öğrencisiyim.
+- Seviyem: konuşmada ${spName}, genelde ${ovName}. Kelime ve cümle karmaşıklığını buna göre ayarla; ara sıra ${target} seviyesinden bir ifade kat ki gelişeyim.
+- Hedeflerim: okul ve tasarım (sunum, portfolyo), staj ve iş (mülakat, e-posta, toplantı), seyahat ve günlük hayat, ileride bir dil sınavı (IELTS gibi).
+- Çocukluktan kalma bir İngilizce çekincem var. Kırmızı kalem gibi davranma; hataları bilgi olarak gör. Gerçek ilerlemeleri fark et ama abartma.
+
+KURALLAR
+1. Sohbet ve pratik tamamen İngilizce; açıklamalar, ipuçları ve düzeltme notları Türkçe.
+2. Hatalı ya da Türkçe bir şey yazarsam: önce ne demek istediğimi anladığını göster, sonra doğal İngilizcesini "✏️" ile ver, nedenini tek cümleyle Türkçe açıkla.
+3. Bir mesajda en fazla 2 düzeltme yap, en önemlilerini seç; küçükleri sona sakla. Beni bunaltma.
+4. Türkçe söylediğim bir cümlenin İngilizcesini verdiysen, bir sonraki mesajda onu kendim kullanmamı iste.
+5. Kısa konuş (2–5 cümle). Konuşan çoğunlukla ben olayım.
+6. Her cevabın sonunda seviyeme uygun, açık uçlu tek bir soru sor.
+7. Takılırsam ("help", "?" ya da Türkçe yazarsam) cevabı hemen verme; önce bir ipucu ya da cümle başlangıcı ver.
+8. Sesli moddaysak düzeltmeleri çok kısa tut, akışı bozma; ayrıntıları özete bırak.
+9. "mod 1", "mod 2", "mod 3", "mod 4" ya da mod adını yazınca o moda geç.
+10. Ben "bitti" deyince bir ÖZET ver:
+   • İyi yaptığım 2 şey
+   • En önemli 5 hatam (yanlış → doğru, kısa Türkçe açıklama)
+   • BU HAFTANIN KURALI: en sık yaptığım hataya dair tek kural
+   • KELİMELERİM: öğrendiğim yeni kelime ve ifadeler, her satırda "english — türkçe — örnek cümle" formatında (bunları kelime kartlarıma yapıştıracağım)
+
+MODLAR
+- Mod 1 · Serbest sohbet: günlük hayat, projelerim, filmler, teknoloji, seyahat.
+- Mod 2 · Rol yapma: bir karakteri oynarsın. Sahneyi Türkçe tek cümleyle kur, sonra karakter olarak gerçekçi devam et. Sahne bitince kısa bir değerlendirme yap.
+- Mod 3 · Kelime & gramer koçu: 3–5 kelime öğret (anlam, örnek cümle, telaffuz ipucu), sonra bunları benim kullanmamı gerektiren bir mini test yap; cevapları ben denedikten sonra ver.
+- Mod 4 · Sınav konuşma provası: IELTS Speaking Part 1, 2, 3 formatında soruları tek tek sor; sonunda tahmini band ve geliştirmem gereken 3 şeyi söyle.`;
+}
+function tutorPrompt(mode, scene){
+  const words = learningWords(8), g = nextGrammar();
+  const start = {
+    free:`BAŞLA: Mod 1. Seviyemi ve hedeflerimi zaten biliyorsun, tekrar sorma. Kısa, sıcak bir merhaba de ve bana bugünümü ya da üzerinde çalıştığım bir projeyi sor.`,
+    role:`BAŞLA: Mod 2. Senaryo: ${scene || SCENES[0]}. Senin rolünü ve sahneyi Türkçe tek cümleyle açıkla, sonra karakter olarak ilk İngilizce repliğini söyle.`,
+    coach:`BAŞLA: Mod 3. ${words.length ? `Kartlarımda şu an öğrenmekte olduğum kelimeler: ${words.join(", ")}. Bunlardan 3'ünü seç ve onlarla uyumlu 2 yeni kelime ekle.` : `Seviyeme uygun, tasarım ve günlük hayattan 5 kelime seç.`} Bu haftaki gramer konum: "${g.topic}". Mini testte bu konuyu da kullandır.`,
+    exam:`BAŞLA: Mod 4. Part 1 ile başla, soruları tek tek sor.`
+  }[mode];
+  return tutorBase() + "\n\n" + start;
+}
+function projectPrompt(){
+  return tutorBase() + `
+
+HER YENİ SOHBETTE
+Kısa bir merhabayla hangi modda çalışmak istediğimi sor (1–4). Rol yapmayı seçersem seviyeme uygun 3 senaryo öner. Kelime koçunu seçersem, istersem kartlarımdaki kelimeleri yapıştıracağımı hatırlat.`;
+}
+let CH = {mode:"free", scene:0};
+function pChat(el){
+  const draw = ()=>{
+    const words = learningWords(8), g = nextGrammar();
+    const sp = lvOf("speaking");
+    el.innerHTML = `<div class="card soft"><h3>LinguaClaude 👋</h3><p class="small" style="margin:0">Sabırlı İngilizce öğretmenin. Modu seç, komutu kopyala, Claude'a yapıştır. Claude mobil uygulamasında ses moduna geçersen gerçek bir konuşma pratiği olur.</p></div>
+    <div class="card" style="padding:6px 18px">${MODES.map((md,i)=>`<label class="check"><input type="radio" name="md" value="${md.k}" ${CH.mode===md.k?"checked":""}><span><b>${md.i} ${md.n}</b><br><span class="small muted">${md.d}</span></span></label>`).join("")}</div>
+    ${CH.mode==="role" ? `<h3 style="margin:16px 0 8px">Senaryo</h3><div class="row" style="margin-bottom:14px">${SCENES.map((s,i)=>`<button class="chip" data-sc="${i}" aria-pressed="${CH.scene===i}">${esc(s)}</button>`).join("")}</div>` : ""}
+    <div class="card small"><div class="tiny" style="margin-bottom:6px">Claude şunları bilecek</div>
+      <div>• Konuşma seviyen: <b>${lvName(sp)}</b>, genel: <b>${lvName(overall())}</b></div>
+      <div>• Hedeflerin: okul/tasarım, staj/iş, seyahat, sınav</div>
+      ${CH.mode==="coach" ? `<div>• Kartlarındaki kelimeler: ${words.length ? esc(words.join(", ")) : "henüz yok, Claude seçecek"}</div><div>• Haftanın gramer konusu: ${esc(g.topic)}</div>` : ""}
+      <div>• Bir mesajda en fazla 2 düzeltme, açıklamalar Türkçe, sohbet İngilizce</div></div>
+    <button class="btn primary block" data-go>Komutu kopyala ve Claude'u aç</button>
+    <div class="card" style="margin-top:12px"><h3>Sohbet bitince</h3><p class="small muted" style="margin:0 0 10px">"bitti" yaz. Claude hatalarını, haftanın kuralını ve yeni kelimeleri listeler. Kelime listesini kopyalayıp kartlarına ekle, böylece unutmazsın.</p><a class="btn" href="#kelime">Kelimeleri kartlara ekle</a></div>
+    <div class="card"><h3>Her seferinde kopyalamak istemiyor musun?</h3>
+      <p class="small muted" style="margin:0 0 8px">claude.ai'de bir <b>Proje</b> kur, LinguaClaude orada kalıcı olsun:</p>
+      <ol class="small" style="margin:0 0 10px;padding-left:20px"><li>claude.ai → Projects → Create project, adı "LinguaClaude"</li><li>Project instructions alanına aşağıdaki talimatı yapıştır</li><li>Artık o projede her yeni sohbet seninle İngilizce dersine başlar</li></ol>
+      <button class="btn" data-proj>Proje talimatını kopyala</button>
+      <p class="tiny" style="margin:8px 0 0">Seviye testini tekrarlayınca talimatı da güncelle; seviyen değişmiş olabilir.</p></div>`;
+  };
+  draw();
+  el.onchange = e=>{ if(e.target.name==="md"){ CH.mode = e.target.value; draw(); } };
+  el.onclick = e=>{
+    const sc = e.target.closest("[data-sc]"); if(sc){ CH.scene = +sc.dataset.sc; draw(); return; }
+    if(e.target.closest("[data-go]")){
+      const md = MODES.find(x=>x.k===CH.mode);
+      bridge("LinguaClaude · "+md.n, tutorPrompt(CH.mode, SCENES[CH.scene]), {tip:"Claude mobil uygulamasında yeni sohbet aç, komutu yapıştır, istersen ses moduna geç. Mod değiştirmek için \"mod 2\" gibi yazman yeterli."});
+      if(DAYPLAN[new Date().getDay()]==="speaking"){ S.done[today()] = Object.assign({}, S.done[today()], {main:true}); save(); }
+    }
+    if(e.target.closest("[data-proj]")) bridge("LinguaClaude Proje talimatı", projectPrompt(), {tip:"Bunu claude.ai'de proje oluştururken 'Project instructions' alanına yapıştır. 'Claude'u aç' yeni bir sohbet açar; proje için soldaki Projects menüsünü kullan."});
+  };
+}
 
 /* ================= ROUTER ================= */
 const TABS = [
@@ -616,8 +707,8 @@ function mainTask(dow){
   if(kind==="speaking"){
     const w = workOf("speaking");
     return {kind, icon:"🗣️", title:"Konuşma", min:15, tag:LV[w],
-      steps:["Pratik → Konuş'ta 5 cümle shadowing yap: dinle, aynı ritimle tekrar et.","Sonra 1 dakika şu konuda konuş: <b>"+esc(pick(S_TOPICS[band(w)]))+"</b>","Konuşman yazıya dökülür; istersen Claude'a gönderip geri bildirim al.", w>=2 ? "Bonus: Claude mobil uygulamasında sesli sohbet (hazır komut aşağıda)." : "Utanmak çok normal. Kimse duymuyor; sadece sen ve telefon."],
-      actions:`<a class="btn" href="#pratik/konus">Konuşmaya başla</a>${w>=2?`<button class="btn ghost" data-act="chat" data-lv="${LV[w]}">Sesli sohbet komutu</button>`:""}`};
+      steps:["Pratik → Konuş'ta 5 cümle shadowing yap: dinle, aynı ritimle tekrar et.","Sonra 1 dakika şu konuda konuş: <b>"+esc(pick(S_TOPICS[band(w)]))+"</b>","Konuşman yazıya dökülür; istersen Claude'a gönderip geri bildirim al.", w>=1 ? "Bonus: LinguaClaude ile 5 dakika rol yapma ya da serbest sohbet." : "Utanmak çok normal. Kimse duymuyor; sadece sen ve telefon."],
+      actions:`<a class="btn" href="#pratik/konus">Konuşmaya başla</a><a class="btn ghost" href="#pratik/sohbet">LinguaClaude ile konuş</a>`};
   }
   if(kind==="fun"){
     const w = workOf("listening");
@@ -684,6 +775,19 @@ function wordById(id){
   if(id.startsWith("b:")){ const w = WORDS.find(x=>"b:"+x[0]===id); return w ? {en:w[0],tr:w[1],ex:w[2],lv:w[3],topic:w[4]} : null; }
   const c = S.custom.find(x=>x.id===id); return c ? {en:c.en,tr:c.tr,ex:c.ex||"",lv:null,topic:"benim"} : null;
 }
+function bulkAdd(text){
+  const have = new Set([...S.custom.map(c=>c.en.toLowerCase()), ...Object.keys(S.cards).filter(k=>k.startsWith("b:")).map(k=>k.slice(2).toLowerCase())]);
+  let added = 0, skipped = 0, n = Date.now();
+  text.split(/\r?\n/).forEach(line=>{
+    const parts = line.replace(/^\s*(?:[-•*]|\d+[.)])\s*/,"").split(/\s+[—–-]\s+|\s*\|\s*|\t/).map(s=>s.replace(/\*\*/g,"").trim()).filter(Boolean);
+    if(parts.length<2) return;
+    const en = parts[0], tr = parts[1], ex = parts.slice(2).join(" — ");
+    if(have.has(en.toLowerCase())){ skipped++; return; }
+    const id = "u:"+(n++); S.custom.push({id,en,tr,ex}); S.cards[id] = {box:0, due:today()}; have.add(en.toLowerCase()); added++;
+  });
+  if(added) save();
+  return {added, skipped};
+}
 const INTERVALS = [0,1,3,7,16,35];
 let CS = null;
 function startSession(mini){
@@ -712,6 +816,10 @@ function vCards(m, sub){
      <input class="f" id="ntr" placeholder="Türkçe anlamı (örn. hafif)">
      <input class="f" id="nex" placeholder="Örnek cümle (isteğe bağlı)" lang="en">
      <button class="btn" id="nadd">Kartlara ekle</button></div>
+    <div class="card stack"><h3 style="margin:0">LinguaClaude'dan toplu ekle</h3>
+     <p class="small muted" style="margin:0">Sohbet sonunda Claude'un verdiği "KELİMELERİM" listesini olduğu gibi yapıştır. Her satır: <i>english — türkçe — örnek cümle</i></p>
+     <textarea id="bulk" rows="4" lang="en" placeholder="lightweight — hafif — This chair is lightweight.&#10;deadline — teslim tarihi — The deadline is on Friday."></textarea>
+     <button class="btn" id="badd">Hepsini kartlara ekle</button></div>
     <h2>Ayar</h2>
     <div class="card between"><span>Günde yeni kelime</span><div class="row">${[3,5,8,12].map(n=>`<button class="chip" data-np="${n}" aria-pressed="${S.settings.newPerDay===n}">${n}</button>`).join("")}</div></div>
     <p class="tiny">Hazır destede ${WORDS.length} kelime var (okul/tasarım, iş, seyahat, günlük hayat). Seviyene kadar olanlar açılır. ${counts.learning} kelime öğrenme aşamasında.</p>`;
@@ -720,6 +828,8 @@ function vCards(m, sub){
       const np = e.target.closest("[data-np]"); if(np){ S.settings.newPerDay = +np.dataset.np; save(); vCards(m); return; }
       if(e.target.id==="nadd"){ const en=$("#nen").value.trim(), tr=$("#ntr").value.trim(); if(!en||!tr){ toast("İngilizce ve Türkçe alanlarını doldur"); return; }
         const id = "u:"+Date.now(); S.custom.push({id,en,tr,ex:$("#nex").value.trim()}); S.cards[id] = {box:0, due:today()}; save(); toast("Eklendi, bugün karşına çıkacak"); vCards(m); }
+      if(e.target.id==="badd"){ const r = bulkAdd($("#bulk").value); if(!r.added && !r.skipped){ toast("Satırları 'english — türkçe' şeklinde yapıştır"); return; }
+        toast(r.added+" kelime eklendi"+(r.skipped?` · ${r.skipped} tanesi zaten vardı`:"")); vCards(m); }
     };
     return;
   }
@@ -763,11 +873,11 @@ function listen(onText, onEnd, continuous){
 }
 function vPractice(m, sub){
   sub = sub || "yaz";
-  const seg = `<div class="seg" role="tablist">${[["yaz","Yaz"],["konus","Konuş"],["dinle","Dinle"]].map(([k,l])=>`<button role="tab" aria-selected="${k===sub}" data-sub="${k}">${l}</button>`).join("")}</div>`;
+  const seg = `<div class="seg" role="tablist">${[["yaz","Yaz"],["konus","Konuş"],["dinle","Dinle"],["sohbet","Sohbet"]].map(([k,l])=>`<button role="tab" aria-selected="${k===sub}" data-sub="${k}">${l}</button>`).join("")}</div>`;
   m.innerHTML = `<h1>Pratik</h1>` + seg + `<div id="pbody"></div>`;
   m.querySelector(".seg").onclick = e=>{ const b=e.target.closest("[data-sub]"); if(b) location.hash = "#pratik/"+b.dataset.sub; };
   const body = $("#pbody");
-  ({yaz:pWrite, konus:pSpeak, dinle:pListen}[sub] || pWrite)(body);
+  ({yaz:pWrite, konus:pSpeak, dinle:pListen, sohbet:pChat}[sub] || pWrite)(body);
 }
 function pWrite(el){
   const w = workOf("writing"), prompts = W_PROMPTS[band(w)];
@@ -815,7 +925,7 @@ function pSpeak(el){
       <div class="tiny" id="frt" style="text-align:center"></div>
       <textarea id="frtx" rows="4" lang="en" placeholder="Konuşman burada yazıya dökülecek. İstersen düzeltebilirsin."></textarea>
       <div class="row" style="margin-top:8px"><button class="btn primary" data-sfb>Claude'dan geri bildirim al</button></div></div>
-     ${w>=1 ? `<div class="card"><h3>3 · Claude ile sesli sohbet</h3><p class="small muted" style="margin:0 0 10px">Claude mobil uygulamasında ses moduyla gerçek bir sohbet. Komut, Claude'un seviyene göre konuşmasını ve hatalarını sonda toplamasını sağlar.</p><button class="btn" data-chat>Sohbet komutunu al</button></div>`:""}
+     <div class="card"><h3>3 · LinguaClaude ile konuş</h3><p class="small muted" style="margin:0 0 10px">Serbest sohbet, rol yapma (kafe, mülakat, jüri…), kelime koçu ya da sınav provası. Claude mobil uygulamasında ses moduyla gerçek bir konuşma.</p><a class="btn" href="#pratik/sohbet">Sohbet modlarına git</a></div>
      ${SR ? "" : `<p class="tiny">Not: Bu tarayıcı konuşmayı yazıya çeviremiyor. Chrome, Edge ya da iPhone'da Safari dene.</p>`}`;
     const shBtn = $("#sh"), out = $("#shout");
     shBtn.onclick = ()=>{
@@ -838,7 +948,6 @@ function pSpeak(el){
       if(e.target.closest("[data-prev]")){ stopRec(); si = Math.max(0,si-1); draw(); }
       else if(e.target.closest("[data-nexts]")){ stopRec(); si = (si+1) % sents.length; if(si===0) toast("Tur tamam! Baştan bir tur daha?"); draw(); }
       else if(e.target.closest("[data-nt]")){ stopRec(); ti = (ti+1) % topics.length; draw(); }
-      else if(e.target.closest("[data-chat]")) bridge("Claude ile sesli sohbet", P.chat(LV[w]), {tip:"Claude mobil uygulamasında yeni sohbet aç, komutu yapıştır, sonra ses moduna geç."});
       else if(e.target.closest("[data-sfb]")){ const t = frtx.value.trim(); if(!t){ toast("Önce konuş ya da yaz"); return; }
         const j = {id:Date.now(), date:today(), prompt:"Konuşma: "+topics[ti], text:t, kind:"konuşma"}; S.journal.push(j);
         if(DAYPLAN[new Date().getDay()]==="speaking") S.done[today()] = Object.assign({}, S.done[today()], {main:true});
