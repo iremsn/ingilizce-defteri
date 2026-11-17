@@ -1315,7 +1315,9 @@ function todaySteps(){
     if(k==="voc"){ const x = bi.voc; s = {n:"Kitap: kelime ünitesi", ic:"📗", d: x.l, item:x, href:"#adim/voc", manual:1,
       how:["Ünitenin sol sayfasını oku, yeni kelimeleri sesli söyle.","Sağ sayfadaki alıştırmaları kurşun kalemle yap.","3 kelimeyi Kelime › Ekle ile kartlarına ekle."]}; }
     if(k==="read" || k==="read2"){
-      const x = (k==="read2" || p<180) && bi.read;
+      // an in-app reading already done today stays as it is when the books toggle changes later in the day
+      const inAppDone = d.rid && d.rid[k] && (stepGet(k) || ((g.rd||{})[d.rid[k]]||{}).d===today());
+      const x = (k==="read2" || p<180) && !inAppDone && bi.read;
       if(x) s = {n:"Kitap: okuma", ic:"📕", d: x.l, item:x, href:"#adim/"+k, manual:1,
         how:["Önce başlığa ve resimlere bak: konu ne?","Bir kez durmadan oku; her kelimeyi anlaman gerekmiyor.","Sorular varsa çöz. Takıldığın en fazla 5 kelimeyi not al."],
         alt:"Kitap yanında değilse: Bugün › 📕 Kitaplar sorusunu “Hayır” yap, bu adım uygulamadaki bir metne dönüşür."};
@@ -1331,7 +1333,7 @@ function todaySteps(){
     if(k==="series"){ const {s:S2, c} = seriesNow(), ep = S2.half ? Math.ceil(c/2) : c, part = S2.half ? (c%2 ? " · ilk yarısı" : " · ikinci yarısı") : "";
       s = {n:"Dizi", ic:"📺", d: `${S2.n} · ${ep}. bölüm${part}`, href:"#adim/series", manual:1, media:["ser", S2.id, c], how:S2.how,
         btns:[[`▶ ${S2.n} ${ep}. bölüm (ara)`, yt(S2.q(ep)), 1]], alt:`Nerede: ${S2.where}. Dizi açılmıyorsa İngilizce altyazılı herhangi bir bölüm de olur; bitince “Bitti”ye dokun.`}; }
-    if(k==="speak"){ const x = bi.pron;
+    if(k==="speak"){ const pronToday = bi.pron && g.done[bi.pron.k] && g.done[bi.pron.k].d===today(), x = stepGet("speak") && !pronToday ? null : bi.pron;   // speaking done in the app stays done
       s = x ? {n:"Kitap: telaffuz", ic:"🗣️", d: x.l, item:x, href:"#adim/speak", manual:1, how:["Ünitedeki kaydı YouTube'da aç (kitap adı + ünite numarasıyla ara).","Kayıtla birlikte sesli tekrar et, sonra alıştırmaları yap.","Kendini 30 saniye kaydet: Oyun › Ses kaydı."]}
             : {n:"Konuşma", ic:"🗣️", d:"Gölge okuma + 1 dakika konuşma (uygulamada, mikrofonla)", href:"#adim/speak", manual:1, at:["#pratik/konus"],
                how:["Pratik › Konuş'u aç: cümleyi dinle, aynı anda sesli tekrar et (3 cümle).","Sonra verilen konu hakkında 1 dakika konuş. Hata serbest!","Bitince buraya dön, “Bitti”ye dokun."], btns:[["🎙️ Pratik › Konuş'u aç", "#pratik/konus"]]}; }
@@ -2514,7 +2516,7 @@ function vToday(m){
   const lastCoach = (S.coach||[]).slice(-1)[0], coachDue = (!lastCoach || lastCoach.date <= addDays(t,-7)) && weekStats().days>=3;
   m.innerHTML = `<div class="tiny">${new Date().toLocaleDateString("tr-TR",{weekday:"long",day:"numeric",month:"long"})}</div>
   <h1>${hello}</h1>
-  <p class="sub">${allDone ? "Bugünün dersini bitirdin. Harika iş! 🎉" : `Bugün ne yapacağını düşünme: aşağıdaki sırayla git, gerisini uygulama söyler. Yaklaşık ${steps.reduce((a,s)=>a+(s.done?0:s.min),0)} dakika.`}</p>
+  <p class="sub">${allDone ? "Bugünün dersini bitirdin. Harika iş! 🎉" : `Yaklaşık ${steps.reduce((a,s)=>a+(s.done?0:s.min),0)} dakika. Yukarıdan aşağı git; her satır ne yapacağını söylüyor.`}</p>
   ${miles.length ? `<div class="card" style="text-align:center"><div style="font-size:40px">${miles.map(x=>x[1]).join(" ")}</div><h3 style="margin:6px 0 2px">Yeni rozet${miles.length>1?"ler":""}: ${miles.map(x=>esc(x[2])).join(", ")}</h3><div class="small muted">${pick(PRAISE)}</div></div>` : ""}
   ${missed2 ? `<div class="card soft small">Tekrar hoş geldin 💜 Ara vermek öğrenmenin parçası. Bugün sadece ilk adımı yapsan bile kaldığın yerden devam etmiş olursun.</div>`:""}
   ${(()=>{ const mo = MOODS.find(x=>x[0]===d.mood), av = AVAIL.find(x=>x[0]===d.avail);
@@ -2522,20 +2524,20 @@ function vToday(m){
     return (mo || av) && !allDone ? `<details><summary class="small muted" style="margin:0 0 10px;cursor:pointer">${mo?mo[1]:"🙂"} · ${av?av[1]:pace()+" dk"} · <u>değiştir</u></summary>${body}</details>` : allDone ? "" : body; })()}
   <div class="card" style="border:2px solid var(--accent)"><div class="between"><h3 style="margin:0">📘 Bugünkü planın</h3><span class="tag acc">${allDone?"bitti ✓":`adım ${cur+1}/${steps.length}`}</span></div>
    ${pace()>=45 && !allDone ? `<div class="small" style="margin:8px 0 2px">📕 Kitapların bugün yanında mı? <span class="row" style="display:inline-flex;gap:6px;vertical-align:middle"><button class="chip" data-books="1" aria-pressed="${booksOn()}">Evet</button><button class="chip" data-books="0" aria-pressed="${!booksOn()}">Hayır</button></span>
-     <div class="tiny" style="margin-top:2px">${!booksOn() ? "Sorun değil: her şey uygulamanın içinde. Okuma metinleri, alıştırmalar ve sorular burada."
+     <div class="tiny" style="margin-top:2px">${!booksOn() ? "Sorun değil, her şey uygulamada. Kitabı sonra yanına alırsan buradan “Evet” de; plan hemen değişir."
        : steps.some(s=>s.item) ? "Kitap adımları aşağıda 📕 / 📗 / 🗣️ “Kitap: …” diye yazıyor; sayfa numarası satırın içinde."
        : !(S.pack && S.pack.game) ? `Kitap görevleri (hangi kitap, hangi sayfa) kurs paketinden gelir. Önce <a href="#kelime">Kelime › Kurs paketi yükle</a>; sonra burada görünürler.`
        : "Bu haftanın kitap görevleri bitmiş 🎉 Oyun sayfasından sonraki haftaya geçebilirsin."}</div></div>` : ""}
-   ${(()=>{ const gs = steps.find(s=>s.k==="gram"); return gs && !allDone ? `<div class="small" style="margin:8px 0 0">🎯 Bugünün konusu: <b>${esc(gs.d)}</b>. Her satırın altındaki <b>→</b> tam olarak ne yapacağını söylüyor.</div>` : ""; })()}
+   ${(()=>{ const gs = steps.find(s=>s.k==="gram"); return gs && !allDone ? `<div class="small" style="margin:8px 0 0">🎯 Bugünün konusu: <b>${esc(gs.d)}</b></div>` : ""; })()}
    <div class="steps">${steps.map((s,i)=>`${s.blk && (i===0 || steps[i-1].blk!==s.blk) && BLK[s.blk] && steps.some(x=>x.blk>1) ? `<div class="tiny" style="margin:12px 0 0;font-weight:700;color:var(--accent)">${esc(BLK[s.blk]).toUpperCase()}</div>` : ""}<div class="sr ${i===cur?"cur":""}">
      <button class="dot ${s.done?"on":""}" data-stick="${s.k}" aria-label="${esc(s.n)}: ${s.done?"yapılmadı olarak işaretle":"yapıldı olarak işaretle"}" style="border:0;cursor:pointer;font:inherit">${s.done?ICON.check:i+1}</button>
      <a href="${s.href}" data-step="${i}" style="flex:1;min-width:0;text-decoration:none;color:inherit;display:flex;gap:10px;align-items:center"><span style="flex:1;min-width:0"><b>${s.ic} ${esc(s.n)}</b><span class="small muted" style="display:block">${esc(s.d)}${(d.ph||{})[s.k] ? ` · 📷 ${d.ph[s.k]} fotoğraf` : ""}${(d.chk||{})[s.k] ? " · 🧑‍🏫 kontrol edildi" : ""}</span>${s.todo && !s.done ? `<span class="tiny" style="display:block;margin-top:2px;color:var(--ink)">→ ${esc(s.todo)}</span>` : ""}${s.book ? `<span class="tiny" style="display:block">📕 ${esc(s.book)}</span>` : ""}</span><span class="tiny" style="flex:none">${s.min} dk ›</span></a></div>`).join("")}</div>
-   ${!allDone ? `<p class="tiny" style="margin:6px 0 0">Daire = işaret kutusu: yaptığın bir şeyi elle işaretleyebilir ya da işareti kaldırabilirsin.</p>` : ""}
+   ${!allDone ? `<p class="tiny" style="margin:6px 0 0">Yaptığın adımın dairesine dokun: işaretlenir.</p>` : ""}
    <a class="btn block" href="#kontrol" style="margin-top:8px">📸 Kitaptan sayfa çözdüm: ekran görüntüsü ekle ve kontrol ettir</a>
    ${allDone ? `<div class="card soft" style="margin:10px 0 0"><b>✓ Bugünlük bu kadar.</b> Artık dinlenebilirsin; yarın burası seni yine sırayla götürecek. <span class="small muted">Yarın: ${esc((nextLesson()||{}).t || "tekrar günü")}.</span>
         <div class="row" style="margin-top:8px">${(game().dice||{})[today()] ? "" : `<button class="btn sm" data-dice>🎲 İstersen zar at (keyifli kapanış)</button>`}</div></div>`
      : `<button class="btn primary block" data-flow style="margin-top:10px">${cur===0 && !steps.some(s=>s.done) ? "Başla" : "Devam et"} → ${steps[cur].ic} ${steps[cur].n}</button>
-        <p class="tiny" style="text-align:center;margin:6px 0 0">${tiny ? "Bugün yoğunsun: sadece kartlar da yeter, ders yarına kalabilir." : "Başka bir sayfaya gitmene gerek yok: her adım bitince uygulama seni kendiliğinden sıradakine götürür. Kaybolursan alttaki mor ▶ çubuğa dokun."}</p>
+        <p class="tiny" style="text-align:center;margin:6px 0 0">${tiny ? "Bugün yoğunsun: sadece kartlar da yeter, ders yarına kalabilir." : "Her adım bitince sıradakine kendiliğinden geçersin. Kaybolursan alttaki mor ▶ çubuğa dokun."}</p>
         `}</div>
   ${coachDue ? `<a class="card between" href="#rehber" style="text-decoration:none;color:inherit"><div><h3 style="margin:0">🧑‍🏫 Haftalık değerlendirme zamanı</h3><div class="small muted">Rehber'de raporunu Claude'a gönder, detaylı geri bildirim ve gelecek haftanın planını al.</div></div>›</a>` : ""}
   <details class="card"><summary><b>📊 İlerlemen, oyun ve hedef tarihler</b></summary><div style="margin-top:10px">${gameCard()}${paceCard(true, true)}
