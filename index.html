@@ -1848,7 +1848,7 @@ function weekItems(s, w){
       [1,2,3].forEach(n=>it.push({k:`${key}-c${n}`, l:`Kurs Gün ${n}: kurs/Hafta-${ww}/Gun-${n} · not → paket (süre tut) → ertesi gün kontrol`, xp:40}));
       const [a,b] = st.listen[w-1]; for(let n=a;n<=b;n++) it.push({k:`L${n}`, l:`Kurs dinleme ${String(n).padStart(2,"0")} (kurs/Hafta-${ww}/Dinleme): başlık → dinle → tekrar dinle → metinle dinle → gölge oku`, xp:20});
       it.push({k:`${key}-kd`, l:`Kurs kelimeleri (${v}): her gün yeni kartlar, her kelimeyle bir cümle`, xp:75, href:"#kelime"}, {k:`${key}-kt`, l:`Kurs kelimeleri (${v}): eş anlamlı testi`, xp:30, href:"#kelime/es"}); } }
-  ((pk && pk.w && pk.w[key]) || []).forEach(([l,xp],i)=>it.push({k:`${key}-p${i}`, l, xp, sup:true}));
+  ((pk && pk.w && pk.w[key]) || []).forEach(([l,xp,tag],i)=>it.push({k:`${key}-p${i}`, l, xp, sup: tag || true}));
   return it;
 }
 /* "Metin 9–10 ve Metin 17", "Uzun metin U1" → uygulamadaki Okuma Kitabı metinlerine bağlantılar */
@@ -1866,7 +1866,7 @@ function gameClick(e, redraw){
 }
 function lvCheck(){ syncGram(); const g = game(), n = gLevel(gXP()); for(let i=0;i<=n;i++) if(!g.lvd[i]) { g.lvd[i] = today(); if(i>0){ g.newLv = i; } } }
 function itemRow(x){ const dn = game().done[x.k]; return `<div class="lrow" style="align-items:center"><button class="tick ${dn?"on":""}" data-gtick="${x.k}" data-xp="${x.xp}" data-l="${esc(x.l)}" aria-label="Tamamlandı işaretle" style="flex:none">${ICON.check}</button>
-  <span style="flex:1;min-width:0" class="small">${x.href?`<a href="${x.href}" style="color:inherit">${esc(x.l)}</a>`:esc(x.l)}${x.sup?` <span class="tag">takviye</span>`:""}${(x.links||[]).length?`<span class="row" style="gap:4px;margin-top:4px">${x.links.map(([t,h])=>{ const b = ((S.game||{}).rd||{})[h.split("/").pop()]; return `<a class="chip" href="${h}" style="text-decoration:none">${esc(t)}${b&&b.of?" ✓":""}</a>`; }).join("")}</span>`:""}</span><span class="tiny">+${x.xp}</span></div>`; }
+  <span style="flex:1;min-width:0" class="small">${x.href?`<a href="${x.href}" style="color:inherit">${esc(x.l)}</a>`:esc(x.l)}${x.sup?` <span class="tag">${x.sup===true?"takviye":esc(x.sup)}</span>`:""}${(x.links||[]).length?`<span class="row" style="gap:4px;margin-top:4px">${x.links.map(([t,h])=>{ const b = ((S.game||{}).rd||{})[h.split("/").pop()]; return `<a class="chip" href="${h}" style="text-decoration:none">${esc(t)}${b&&b.of?" ✓":""}</a>`; }).join("")}</span>`:""}</span><span class="tiny">+${x.xp}</span></div>`; }
 function gameHead(){ const x = gXP(), i = gLevel(x), nx = GLV[i+1], g = game(), st = GSTAGES[g.stage-1], ln = lane();
   const pct = nx ? Math.round(100*(x-GLV[i][1])/(nx[1]-GLV[i][1])) : 100;
   return `<div class="between"><div><div class="tiny">AŞAMA ${g.stage} · ${esc(st.n.toUpperCase())} · ${st.lv}</div><h3 style="margin:2px 0 0">🎮 Seviye ${i+1} · ${GLV[i][0]}</h3></div><span class="tag acc">${x.toLocaleString("tr-TR")} XP</span></div>
@@ -1922,7 +1922,7 @@ function vGame(m, sub){
    <div class="row"><button class="btn sm" data-rvsave>Kaydet</button><button class="btn ghost sm" data-gcoach>Claude'dan haftalık koçluk al</button></div></div>
   <details class="card"><summary class="small"><b>XP nasıl kazanılır?</b></summary><div class="small" style="margin-top:8px;line-height:1.7">
    Otomatik: uygulamada günlük çalışma (kelime + ders) 5 · uygulamadaki dersi %85+ geçmek 10 · başlangıç hediyesi 50<br>
-   Dilbilgisi ünitesi 30 (dersi geçince kendiliğinden) · işaretleyerek: okuma metni 25 · takviye okuma 25 · telaffuz ünitesi 15 · kurs kelimeleri haftası 75 + test 30 · kurs günü 40 · kurs dinleme 20<br>
+   Dilbilgisi ünitesi 30 (dersi geçince kendiliğinden) · işaretleyerek: okuma metni 25 · takviye okuma 25 · telaffuz ünitesi 15 · kurs kelimeleri haftası 75 + test 30 · kurs günü 40 · kurs dinleme 20 · kurs ek dosyası 15–25 · essay 30<br>
    Diğer: ses kaydı 10 · 5 hata 10 · zarf 40 · boss 150 (denemek 50) · zar görevi 15–20</div></details>
   <details class="card"><summary class="small"><b>Açık kartlar: seni nasıl "kandırıyorum"?</b></summary><ol class="small" style="margin:8px 0 0;padding-left:20px;line-height:1.6">
    <li>Kolay bir zaferle başlatıyorum: ustalık deneyimi özgüveni en çok besleyen şey (Bandura).</li><li>Seni %85 bölgesinde tutuyorum: öğrenme en hızlı orada (Wilson ve ark. 2019).</li><li>50 XP hediye ile başlatıyorum: kazanılmış ilerleme etkisi (Nunes & Drèze 2006).</li><li>Hedefe yaklaştıkça seviyeler kısalıyor: hedef eğimi etkisi (Kivetz ve ark. 2006).</li><li>Kapalı zarflar merakını kullanıyor: bilgi boşluğu (Loewenstein 1994).</li><li>Günü keyifli bitiriyorum: zirve-son kuralı (Kahneman ve ark. 1993).</li><li>İlerlemeni görünür yapıyorum: ilerleme ilkesi (Amabile & Kramer 2011).</li><li>Seçim hakkı veriyorum: zar, joker, şerit (Deci & Ryan).</li><li>Hataya puan veriyorum: hata bilgidir.</li></ol><p class="tiny">Bilmen etkilerini azaltmaz; işe yaramalarının nedeni beynin nasıl çalıştığı.</p></details>`;
@@ -2349,7 +2349,7 @@ function vCards(m, sub){
        <div class="small muted">${pStarted} kart başladı, ${pKnown} tanesi oturdu. Eş anlamlılar gruplar halinde gelir: kartın ön yüzünde her seferinde gruptan farklı bir kelime çıkar, arkasında hepsi yazar.</div>
        <div class="between"><span class="small">Günde yeni sınav kartı</span><div class="row">${[0,3,5,8,12].map(n=>`<button class="chip" data-pp="${n}" aria-pressed="${(S.settings.packPerDay??5)===n}">${n}</button>`).join("")}</div></div>
        <a class="btn" href="#kelime/es">Eş anlamlı testi (10 soru)</a>
-       ${pk.reads ? "" : `<div class="card soft small" style="margin:0">🆕 Paketin yeni sürümünde Okuma Kitabı'nın 26 metni, takviye kitap planı ve telaffuz programı var. Aynı dosyayı bir kez daha seç; kartlardaki ilerlemen korunur. <label class="btn sm" style="margin-top:6px">Paketi güncelle<input type="file" accept="application/json,.json" data-pack hidden></label></div>`}</div>`
+       ${pk.reads && Object.values((pk.game||{}).w||{}).some(rs=>rs.some(r=>r[2]==="kurs")) ? "" : `<div class="card soft small" style="margin:0">🆕 Paketin yeni sürümünde Okuma Kitabı'nın 26 metni, takviye kitap planı, telaffuz programı ve kurs klasöründeki ek dosyalar (başlangıç, ek notlar, essay) var. Aynı dosyayı bir kez daha seç; kartlardaki ilerlemen korunur. <label class="btn sm" style="margin-top:6px">Paketi güncelle<input type="file" accept="application/json,.json" data-pack hidden></label></div>`}</div>`
      : `<div class="card stack"><h3 style="margin:0">🎓 Kurs paketi yükle</h3><p class="small muted" style="margin:0">Test Atölyesi kelime listesini (1.100+ eş anlamlı kelime ve 91 phrasal verb) senin için hazırladım. Bilgisayarda düğmeye bas ve şu dosyayı seç: <b>Masaüstü › claude ile hayatı kolaylaştır › ingilizce-paket › test-atolyesi-kelime.json</b>. Bir kez yüklemen yeter; Drive eşitlemesi açıksa telefonuna da kendiliğinden geçer. Paket sadece sende kalır, sitede yayınlanmaz.</p>
        <label class="btn">Paket dosyasını seç<input type="file" accept="application/json,.json" data-pack hidden></label></div>`;
     const finished = CS && CS.total;
