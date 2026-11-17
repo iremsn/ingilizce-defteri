@@ -460,7 +460,123 @@ const RES = [
 const KEY = "ingilizce-defteri-v1";
 function fresh(){ return {v:1, onboarded:false, levels:null, testDate:null, history:[], cards:{}, custom:[], newOn:{}, done:{}, grammarDone:[], journal:[], settings:{newPerDay:5, rate:0.9}}; }
 let S = (()=>{ try{ const r = localStorage.getItem(KEY); if(r){ return Object.assign(fresh(), JSON.parse(r)); } }catch(e){} return fresh(); })();
-function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
+function saveLocal(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
+function save(){ S.updatedAt = Math.max(Date.now(), (S.updatedAt||0)+1); saveLocal(); if(typeof Sync!=="undefined") Sync.dirty(); }
+
+/* ---------- Google Drive sync: one JSON file in the user's hidden appDataFolder ---------- */
+const GOOGLE_CLIENT_ID = "388205885492-147rl8lhuqrpgek57i9a8283qgrnlkvq.apps.googleusercontent.com";
+const DRIVE_FILE = "ingilizce-defteri.json";
+const lsGet = (k, d)=>{ try{ const v = localStorage.getItem(k); return v==null ? d : JSON.parse(v); }catch(e){ return d; } };
+const lsSet = (k, v)=>{ try{ v==null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); }catch(e){} };
+// Merge two copies of the state so that nothing written on either device is lost.
+function mergeState(L, R){
+  if(!R || R.v!==1) return L;
+  if((L.resetAt||0) > (R.updatedAt||0)) return L;
+  if((R.resetAt||0) > (L.updatedAt||0)) return Object.assign(fresh(), R);
+  const M = JSON.parse(JSON.stringify(L));
+  const newer = (R.updatedAt||0) > (L.updatedAt||0) ? R : L;
+  const byKey = (arr, key)=>{ const m = new Map(); arr.forEach(x=>{ const k = key(x); m.set(k, Object.assign({}, m.get(k)||{}, x)); }); return [...m.values()]; };
+  M.onboarded = !!(L.onboarded || R.onboarded);
+  if((R.testDate||"") > (L.testDate||"") || (!M.levels && R.levels)){ M.levels = R.levels; M.testDate = R.testDate; }
+  M.history = byKey([...(L.history||[]), ...(R.history||[])], h=>h.date+JSON.stringify(h.levels)).sort((a,b)=>a.date<b.date?-1:1);
+  for(const [id,c] of Object.entries(R.cards||{})){ const l = M.cards[id]; if(!l || c.due>l.due || (c.due===l.due && c.box>l.box)) M.cards[id] = c; }
+  M.custom = byKey([...(L.custom||[]), ...(R.custom||[])], c=>c.id);
+  for(const [d,v] of Object.entries(R.newOn||{})) M.newOn[d] = Math.max(M.newOn[d]||0, v);
+  for(const [d,v] of Object.entries(R.done||{})){ const o = M.done[d]||{}; M.done[d] = {}; ["cards","main","write"].forEach(k=>{ if(o[k]||v[k]) M.done[d][k] = true; }); }
+  M.grammarDone = [...new Set([...(L.grammarDone||[]), ...(R.grammarDone||[])])];
+  M.journal = byKey([...(R.journal||[]), ...(L.journal||[])], j=>j.id).sort((a,b)=>a.id-b.id);
+  if(R.wr){
+    const a = M.wr || {stage:0, done:{}, count:[0,0,0,0,0], rules:[], free:0, micro:0, sentences:0, dismissUp:0}, b = R.wr;
+    for(const [id,s] of Object.entries(b.done||{})) a.done[id] = Math.max(a.done[id]||0, s);
+    a.count = [0,1,2,3,4].map(i=>Math.max((a.count||[])[i]||0, (b.count||[])[i]||0));
+    ["free","micro","sentences"].forEach(k=>a[k] = Math.max(a[k]||0, b[k]||0));
+    a.rules = byKey([...(a.rules||[]), ...(b.rules||[])], r=>r.text+r.date);
+    if(newer===R){ a.stage = b.stage; a.dismissUp = b.dismissUp; }
+    M.wr = a;
+  }
+  M.settings = Object.assign({}, newer.settings);
+  M.updatedAt = Math.max(L.updatedAt||0, R.updatedAt||0);
+  M.resetAt = Math.max(L.resetAt||0, R.resetAt||0);
+  return M;
+}
+const Sync = (()=>{
+  const SCOPE = "https://www.googleapis.com/auth/drive.appdata";
+  const K = KEY+":g";
+  let busy = false, again = false, dirtyFlag = false, state = "off", lastAt = 0, errMsg = "", timer = null;
+  const tok = ()=>{ const t = lsGet(K+"tok", null); return t && t.e > Date.now()+60e3 ? t.t : null; };
+  const on = ()=>!!lsGet(K+"on", false);
+  const redirectUri = ()=>location.origin + location.pathname;
+  function text(){
+    if(!on()) return "Kapalı · veriler sadece bu cihazda";
+    return {sync:"Eşitleniyor…", ok:"Drive'da güncel · "+new Date(lastAt).toLocaleTimeString("tr-TR",{hour:"2-digit",minute:"2-digit"}), auth:"Yeniden bağlanman gerekiyor", offline:"Çevrimdışı · bu cihazda kayıtlı, internet gelince eşitlenir", error:"Eşitlenemedi: "+errMsg}[state] || "Bağlı";
+  }
+  function paint(){ document.querySelectorAll("[data-sync-text]").forEach(n=>n.textContent = text()); }
+  function setState(s, msg){ state = s; errMsg = msg||""; paint(); }
+  function connect(silent){
+    const st = Math.random().toString(36).slice(2); lsSet(K+"state", st); lsSet(K+"try", Date.now());
+    const q = {client_id:GOOGLE_CLIENT_ID, redirect_uri:redirectUri(), response_type:"token", scope:SCOPE, include_granted_scopes:"true", state:st+"|"+(location.hash||"#ben")};
+    if(silent) q.prompt = "none";
+    location.assign("https://accounts.google.com/o/oauth2/v2/auth?"+new URLSearchParams(q));
+  }
+  // Runs before routing: picks up the token Google sends back in the URL fragment.
+  function handleRedirect(){
+    const h = location.hash;
+    if(!/[#&](access_token|error)=/.test(h)) return;
+    const q = new URLSearchParams(h.slice(1));
+    const [st, back] = (q.get("state")||"").split("|");
+    history.replaceState(null, "", location.pathname + (back && back.startsWith("#") && !back.includes("access_token") ? back : "#ben"));
+    if(st !== lsGet(K+"state", null)) return;
+    lsSet(K+"state", null);
+    if(q.get("access_token")){ lsSet(K+"tok", {t:q.get("access_token"), e:Date.now()+(+q.get("expires_in")||3600)*1000}); if(!on()){ lsSet(K+"on", true); setTimeout(()=>toast("Google Drive bağlandı ☁️"), 500); } }
+    else if(!/interaction_required|login_required|consent_required/.test(q.get("error"))) setTimeout(()=>toast("Google bağlantısı kurulamadı: "+q.get("error")), 600);
+  }
+  function disconnect(){ const t = lsGet(K+"tok", null); if(t) fetch("https://oauth2.googleapis.com/revoke?token="+encodeURIComponent(t.t), {method:"POST"}).catch(()=>{}); lsSet(K+"tok", null); lsSet(K+"on", false); setState("off"); }
+  async function api(path, opt){
+    opt = opt||{}; const t = tok(); if(!t) throw {code:"auth"};
+    let r; try{ r = await fetch("https://www.googleapis.com"+path, Object.assign({}, opt, {headers:Object.assign({Authorization:"Bearer "+t}, opt.headers||{})})); }catch(e){ throw {code:"offline"}; }
+    if(r.status===401){ lsSet(K+"tok", null); throw {code:"auth"}; }
+    if(!r.ok) throw {code:"http", message:r.status+" "+(await r.text()).slice(0,160)};
+    return r;
+  }
+  async function put(body, fileId){
+    const fd = new FormData();
+    fd.append("metadata", new Blob([JSON.stringify(fileId ? {} : {name:DRIVE_FILE, parents:["appDataFolder"]})], {type:"application/json"}));
+    fd.append("file", new Blob([body], {type:"application/json"}));
+    return (await api((fileId ? "/upload/drive/v3/files/"+fileId : "/upload/drive/v3/files")+"?uploadType=multipart&fields=id", {method:fileId?"PATCH":"POST", body:fd})).json();
+  }
+  async function run(){
+    if(!on()) return;
+    if(!tok()){ setState("auth"); return; }
+    if(!navigator.onLine){ setState("offline"); return; }
+    if(busy){ again = true; return; }
+    busy = true; dirtyFlag = false; setState("sync");
+    try{
+      const j = await (await api("/drive/v3/files?spaces=appDataFolder&q="+encodeURIComponent("name='"+DRIVE_FILE+"'")+"&fields=files(id,modifiedTime)")).json();
+      const f = j.files && j.files[0];
+      let remote = null; if(f) remote = await (await api("/drive/v3/files/"+f.id+"?alt=media")).json();
+      const before = JSON.stringify(S);
+      const merged = remote ? mergeState(S, remote) : S;
+      const after = JSON.stringify(merged);
+      if(after !== before){ S = merged; saveLocal(); applyTheme(); const a = document.activeElement; if(!a || !/^(INPUT|TEXTAREA)$/.test(a.tagName)) render(); }
+      if(!remote || after !== JSON.stringify(remote) || dirtyFlag){ dirtyFlag = false; await put(JSON.stringify(S), f && f.id); }
+      lastAt = Date.now(); setState("ok");
+    }catch(e){
+      setState(e && e.code==="auth" ? "auth" : e && e.code==="offline" ? "offline" : "error", e && e.message || "");
+    }finally{ busy = false; if(again){ again = false; setTimeout(run, 500); } }
+  }
+  function dirty(){ dirtyFlag = true; if(on()){ clearTimeout(timer); timer = setTimeout(run, 3000); } }
+  function start(){
+    paint();
+    if(!on()) return;
+    // token expired: refresh silently (Google skips the consent screen once it was granted)
+    if(!tok() && navigator.onLine && Date.now() - lsGet(K+"try", 0) > 120e3){ connect(true); return; }
+    run();
+    setInterval(()=>{ if(document.visibilityState==="visible") run(); }, 60e3);
+    document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="hidden"){ if(dirtyFlag) run(); } else run(); });
+    window.addEventListener("online", run);
+  }
+  return {on, connect, disconnect, handleRedirect, run, dirty, start, text, paint};
+})();
 
 /* ================= HELPERS ================= */
 const $ = s => document.querySelector(s);
@@ -904,7 +1020,8 @@ function vToday(m){
   <h2>Haftalık ritim</h2>
   <div class="card small" style="padding:6px 18px">${[1,2,3,4,5,6,0].map(x=>{ const k=DAYPLAN[x]; const lab={grammar:"🧩 Gramer",reading:"📖 Okuma",listening:"🎧 Dinleme",writing:"✍️ Yazma",speaking:"🗣️ Konuşma",fun:"🍿 Keyif günü (dizi, şarkı)",review:"🌿 Hafif tekrar / dinlen"}[k];
     return `<div class="between" style="padding:7px 0;${x!==1?"border-top:1px solid var(--line)":""}${x===dow?";font-weight:600;color:var(--accent)":""}"><span>${DOW[x]}</span><span>${lab}</span></div>`; }).join("")}</div>
-  <p class="tiny">Her gün buna ek olarak 5 dakika kelime kartı var.</p>`;
+  <p class="tiny">Her gün buna ek olarak 5 dakika kelime kartı var.</p>
+  <p class="tiny" style="text-align:center;margin-top:18px"><a href="#ben" style="color:inherit">☁️ <span data-sync-text>${esc(Sync.text())}</span></a></p>`;
   m.onclick = e=>{
     const tk = e.target.closest("[data-tick]");
     if(tk){ const k = tk.dataset.tick; S.done[t] = Object.assign({}, S.done[t]); S.done[t][k] = !S.done[t][k]; save(); vToday(m); if(S.done[t][k]) toast("Tamamlandı ✓"); return; }
@@ -1338,7 +1455,10 @@ function vMe(m){
    ${[["A1","Temel kalıplar: kendini tanıtmak, basit sorular."],["A2","Günlük işleri halletmek: alışveriş, yol, kısa mesajlar."],["B1","Seyahatte rahat, deneyim anlatabilen, bağımsız kullanıcı. Çoğu staj ve değişim programı en az bunu ister."],["B2","Akıcı sohbet, fikir savunma, iş ve okulda rahat çalışma. Yurtdışı yüksek lisans genelde B2–C1 (IELTS 6.5 civarı) ister."],["C1","İncelikli, akademik ve profesyonel kullanım."]].map(([a,b],i)=>`<div style="padding:8px 0;${i?"border-top:1px solid var(--line)":""}"><b>${a}</b> <span class="muted">${b}</span></div>`).join("")}</div>
   <p class="tiny">Kabaca bir sonraki seviyeye geçmek, günde 15–20 dakikayla 4–6 ay sürer. Başlangıç seviyeleri daha hızlı geçer.</p>
   <h2>Verilerim</h2>
-  <div class="card stack"><p class="small muted" style="margin:0">Her şey sadece bu cihazda, tarayıcıda saklanıyor. Telefon değiştirirken ya da ara sıra yedek al.</p>
+  <div class="card stack"><div class="between" style="align-items:flex-start"><div><h3 style="margin:0">☁️ Google Drive eşitlemesi</h3><div class="small muted" data-sync-text>${esc(Sync.text())}</div></div></div>
+   <p class="small muted" style="margin:0">İlerlemen kendi Google Drive'ında, sadece bu uygulamanın görebildiği gizli bir klasörde saklanır. Telefonda ve bilgisayarda aynı Google hesabıyla bağlan; ikisi de aynı verileri görür. Bir cihazda internet yoksa, bağlanınca kendiliğinden eşitlenir.</p>
+   <div class="row">${Sync.on() ? `<button class="btn" data-sync>Şimdi eşitle</button><button class="btn ghost" data-unsync>Bağlantıyı kes</button>` : `<button class="btn primary" data-gconnect>Google Drive'a bağlan</button>`}</div></div>
+  <div class="card stack"><p class="small muted" style="margin:0">Ek güvence: ara sıra yedek dosyası indirebilirsin.</p>
    <div class="row"><button class="btn" data-exp>Yedeği indir</button><label class="btn">Yedekten yükle<input type="file" accept="application/json" data-imp hidden></label></div>
    <div class="row"><span class="small">Görünüm</span>${[["","Otomatik"],["light","Açık"],["dark","Koyu"]].map(([k,l])=>`<button class="chip" data-th="${k}" aria-pressed="${(S.settings.theme||"")===k}">${l}</button>`).join("")}</div>
    <div class="row"><span class="small">Konuşma hızı</span>${[[0.8,"Yavaş"],[0.9,"Normal"],[1,"Doğal"]].map(([k,l])=>`<button class="chip" data-rate="${k}" aria-pressed="${S.settings.rate===k}">${l}</button>`).join("")}</div>
@@ -1347,15 +1467,20 @@ function vMe(m){
     if(e.target.closest("[data-exp]")){ const b = new Blob([JSON.stringify(S,null,1)],{type:"application/json"}); const a=document.createElement("a"); a.href=URL.createObjectURL(b); a.download="ingilizce-yedek-"+today()+".json"; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); return; }
     const th = e.target.closest("[data-th]"); if(th){ S.settings.theme = th.dataset.th; save(); applyTheme(); vMe(m); return; }
     const rt = e.target.closest("[data-rate]"); if(rt){ S.settings.rate = +rt.dataset.rate; save(); speak("This is how fast I will speak."); vMe(m); return; }
-    if(e.target.closest("[data-reset]")){ if(confirm("Tüm ilerleme, kartlar ve yazılar silinecek. Emin misin? (Önce yedek almanı öneririm.)")){ S = fresh(); save(); location.hash="#bugun"; render(); } }
+    if(e.target.closest("[data-gconnect]")){ Sync.connect(false); return; }
+    if(e.target.closest("[data-sync]")){ Sync.run(); return; }
+    if(e.target.closest("[data-unsync]")){ if(confirm("Bu cihazın Drive bağlantısı kesilecek. Veriler bu cihazda ve Drive'da kalır.")){ Sync.disconnect(); vMe(m); } return; }
+    if(e.target.closest("[data-reset]")){ if(confirm("Tüm ilerleme, kartlar ve yazılar silinecek"+(Sync.on()?" (Drive'daki kopya dahil)":"")+". Emin misin? (Önce yedek almanı öneririm.)")){ S = fresh(); S.resetAt = Date.now(); save(); location.hash="#bugun"; render(); } }
   };
-  m.querySelector("[data-imp]").onchange = ev=>{ const f = ev.target.files[0]; if(!f) return; f.text().then(t=>{ try{ const d = JSON.parse(t); if(!d || d.v!==1) throw 0; S = Object.assign(fresh(), d); save(); applyTheme(); toast("Yedek yüklendi"); render(); }catch(err){ toast("Bu dosya bir yedek değil gibi"); } }); };
+  m.querySelector("[data-imp]").onchange = ev=>{ const f = ev.target.files[0]; if(!f) return; f.text().then(t=>{ try{ const d = JSON.parse(t); if(!d || d.v!==1) throw 0; S = Object.assign(fresh(), d); S.resetAt = Date.now(); save(); applyTheme(); toast("Yedek yüklendi"); render(); }catch(err){ toast("Bu dosya bir yedek değil gibi"); } }); };
 }
 function applyTheme(){ const t = S.settings.theme; if(t) document.documentElement.setAttribute("data-theme", t); else document.documentElement.removeAttribute("data-theme"); }
 
 /* ================= BOOT ================= */
+Sync.handleRedirect();
 applyTheme();
 render();
+Sync.start();
 if("serviceWorker" in navigator && location.protocol==="https:") navigator.serviceWorker.register("sw.js").catch(()=>{});
 </script>
 </body>
