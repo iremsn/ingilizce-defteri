@@ -1020,7 +1020,7 @@ ${text}`,
     const w = weekStats(), T = totals(), goals = (S.goals || GOALS.map(g=>g.k)).map(k=>(GOALS.find(g=>g.k===k)||{}).n).filter(Boolean);
     const passed = LESSONS.filter(l=>lessonPassed(l.id)).map(l=>`${l.t} (%${gr().done[l.id].best})`);
     const recent = S.journal.slice(-4).map(j=>`[${j.date} · ${j.prompt||j.kind}]\n${(j.text||"").slice(0,500)}`).join("\n\n");
-    return `Sen benim İngilizce koçumsun. Ben Türkçe konuşan bir endüstriyel tasarım öğrencisiyim. Çocukluktan beri İngilizceden kaçtım ve şimdi ciddi şekilde, günde 15–20 dakika çalışıyorum. Nazik ama dürüst ol; Türkçe yaz.
+    return `Sen benim İngilizce koçumsun. Ben Türkçe konuşan bir endüstriyel tasarım öğrencisiyim. Çocukluktan beri İngilizceden kaçtım ve şimdi ciddi şekilde çalışıyorum (temposu dönemine göre değişiyor). Nazik ama dürüst ol; Türkçe yaz.
 
 HEDEFLERİM: ${goals.join("; ") || "genel İngilizce"}. Ana hedef: hazırlık / proficiency seviyesi (B2), sonra C1.
 SEVİYE TESTİ: ${S.levels ? Object.keys(SK).map(k=>SK[k]+" "+lvName(S.levels[k])).join(", ") : "yapılmadı"}
@@ -1031,6 +1031,7 @@ GEÇTİĞİM DERSLER: ${passed.join(", ") || "henüz yok"}
 ZORLANDIĞIM DERSLER: ${T.weak.map(x=>x.l.t+" (%"+x.best+")").join(", ") || "yok"}
 SIK UNUTTUĞUM KELİMELER: ${T.lapsed.map(x=>x.en).join(", ") || "yok"}
 SIRADAKİ DERS: ${(nextLesson()||{}).t || "hepsi bitti"}
+TEMPO VE TAHMİN: ${forecastText()}${resting()?" Şu an jüri / sınav modundayım (günde 2 dk).":""}
 
 SON YAZILARIM:
 ${recent || "henüz yok"}
@@ -1512,6 +1513,125 @@ function startSyn(){
   GP = {mode:"syn", lid:"syn", items, i:0, first:{}, re:new Set(), fb:null, built:[], pool:null, saved:false};
 }
 
+/* ---------- pace, study time and target dates ---------- */
+// Approximate cumulative guided-learning hours to reach each level (Cambridge estimates): A1, A2, B1, B2, C1
+const LV_HOURS = [100, 200, 375, 550, 800];
+const PACES = {
+  20:{n:"Hafif", items:["Bugün akışı: Kelime → Gramer → Cümle kur"]},
+  45:{n:"Dengeli", items:["Bugün akışı (18 dk)","Bonus görev: okuma, dinleme ya da konuşma (12 dk)","15 dk İngilizce altyazılı dizi ya da video"]},
+  60:{n:"Kararlı", items:["Bugün akışı (18 dk)","Bonus görev (12 dk)","15 dk dizi ya da video","15 dk kitap: gramer ya da okuma kitabından 1 bölüm"]},
+  90:{n:"Yoğun", items:["Bugün akışı (18 dk)","Bonus görev (12 dk)","Gramer sekmesinden 2. ders (8 dk)","20 dk kitap bölümü","30 dk dizi / podcast, sınav kelime paketi günde 12 kart"]},
+  180:{n:"Kamp", items:["Bugün akışı (18 dk)","Gramer: 2–3 ders + tekrar (25 dk)","Kelime: sınav paketi günde 20 kart + eş anlamlı testi (20 dk)","Okuma: 2 metin, Pratik → Oku ya da okuma kitabı (30 dk)","Dinleme: 1 saat. Önce metne bakmadan not alarak dinle, sonra metinle tekrar dinle.","Yazma / konuşma: Claude ile 20 dk (paragraf, essay ya da sohbet)","Haftada bir: koç raporu ve deneme"]}
+};
+function resting(){ return !!(S.settings.rest && S.settings.rest >= today()); }
+function basePace(){ return resting() ? 5 : (S.settings.pace || 45); }
+function pace(){ const a = (S.done[today()]||{}).avail; return a || basePace(); }   // today's answer to "how much time do you have?" wins
+function itemsFor(p){ if(p<=5) return REST_ITEMS; const k = [20,45,60,90,180].filter(x=>x<=p).pop() || 20; return PACES[k].items; }
+const AVAIL = [[5,"5 dk"],[20,"20 dk"],[45,"45 dk"],[60,"1 saat"],[90,"1,5 saat"],[180,"3 saat"]];
+function setPace(p){ S.settings.pace = p; if(S.pack){ S.settings.packPerDay = p>=180 ? 20 : p>=90 ? 12 : p>=45 ? 5 : 3; } save(); }
+const REST_ITEMS = ["Sadece 2 dakikalık mini kartlar (5 kart). Seri bozulmaz.","Gramer, yazma ve bonus görevler bekleyebilir.","Kafan dinlenirken dizi izlersen +dk olarak ekleyebilirsin."];
+function dayMin(d){ const l = (S.log||{})[d] || {};
+  const est = (l.cards||0)*0.25 + (l.q||0)*0.5 + (l.sent||0)*1.5 + (l.lessons||0)*4;
+  return Math.max(l.min||0, est) + (l.ext||0); }
+function baseHours(){
+  if(!S.levels) return 0;
+  const v = ["vocab","grammar","reading","listening"].map(k=>S.levels[k] ?? -1), avg = v.reduce((a,b)=>a+b,0)/v.length;
+  if(avg<0) return Math.round(100*(avg+1));
+  const lo = Math.floor(avg), hi = Math.min(4, lo+1);
+  return Math.round(LV_HOURS[lo] + (LV_HOURS[hi]-LV_HOURS[lo])*(avg-lo));
+}
+function studiedHours(){ return Object.keys(S.log||{}).reduce((s,d)=>s+dayMin(d),0)/60; }
+function totalHours(){ return baseHours() + studiedHours(); }
+function recentAvg(){ const t = today(); let sum = 0, active = 0, first = null;
+  for(let i=0;i<14;i++){ const d = addDays(t,-i), m = dayMin(d); sum += m; if(m>0){ active++; first = i; } }
+  return active>=3 ? Math.round(sum/Math.min(14, (first||0)+1)) : null; }
+function eta(targetH, perDay){
+  const rem = targetH - totalHours(); if(rem<=0) return "ulaştın 🎉";
+  const d = new Date(addDays(today(), Math.ceil(rem*60/Math.max(5, perDay))) + "T12:00:00");
+  return d.toLocaleDateString("tr-TR", {month:"long", year:"numeric"});
+}
+function weekMin(){ const t = today(), now = new Date(t+"T12:00:00"), mon = addDays(t, -((now.getDay()+6)%7)); let s = 0; for(let i=0;i<7;i++){ const d = addDays(mon,i); if(d>t) break; s += dayMin(d); } return Math.round(s); }
+function addExt(n){ logAdd("ext", n); save(); toast(`+${n} dk eklendi`); }
+// Active study time: counted in 30-second slices while the app is visible and you're interacting.
+let LAST_ACT = Date.now(), ACT_TICK = 0;
+["pointerdown","keydown","touchstart","scroll"].forEach(ev=>addEventListener(ev, ()=>{ LAST_ACT = Date.now(); }, {passive:true}));
+setInterval(()=>{ if(S.onboarded && document.visibilityState==="visible" && Date.now()-LAST_ACT < 90000){ logAdd("min", 0.5); saveLocal(); if(++ACT_TICK % 6 === 0) save(); } }, 30000);
+function paceCard(compact){
+  const p = compact ? pace() : basePace(), today_m = Math.round(dayMin(today())), wk = weekMin(), avg = recentAvg(), rest = resting(), avail = (S.done[today()]||{}).avail;
+  const items = compact ? itemsFor(p) : rest ? REST_ITEMS : PACES[p].items;
+  const restEnd = rest ? new Date(S.settings.rest+"T12:00:00").toLocaleDateString("tr-TR",{day:"numeric",month:"long"}) : "";
+  if(compact) return `<div class="card ${rest&&!avail?"soft":""}">
+    <div class="small" style="margin-bottom:6px"><b>Bugün ne kadar vaktin var?</b></div>
+    <div class="row" style="margin-bottom:12px">${AVAIL.map(([n,l])=>`<button class="chip" data-avail="${n}" aria-pressed="${p===n}">${l}</button>`).join("")}</div>
+    <div class="between"><h3 style="margin:0">${rest&&!avail?`🛡️ Jüri / sınav modu · ${restEnd}'e kadar`:`⏱️ Bugünkü hedef: ${p>=60?(p/60).toString().replace(".",",")+" saat":p+" dk"}`}</h3><span class="tag ${today_m>=p?"ok":"acc"}">${today_m} dk</span></div>
+    <div class="bar" style="margin:10px 0 8px"><i style="width:${Math.min(100, Math.round(100*today_m/p))}%"></i></div>
+    <ul class="small" style="margin:0 0 8px;padding-left:20px">${items.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>
+    <div style="margin:4px 0 12px">${forecastHTML(rest&&!avail ? (S.settings.pace||45) : p, true)}</div>
+    ${p<=5 ? `<div class="row" style="margin-bottom:8px"><a class="btn sm" href="#kelime/mini">2 dk kartlar</a>${rest?`<button class="btn ghost sm" data-unrest>Jüri modundan çık</button>`:""}</div>` : ""}
+    <div class="row"><span class="tiny">Uygulama dışında çalıştın mı? (dizi, kitap, ders)</span>${[10,20,30].map(n=>`<button class="chip" data-ext="${n}">+${n} dk</button>`).join("")}</div></div>`;
+  return `<div class="card stack"><div class="between"><h3 style="margin:0">⏱️ Tempo ve hedef tarihler</h3><span class="tag acc">${rest?"Jüri modu":PACES[p].n}</span></div>
+    <div class="row"><span class="small">Günde</span>${Object.keys(PACES).map(k=>`<button class="chip" data-pace="${k}" aria-pressed="${!rest && p===+k}">${+k>=180?"3 saat (kamp)":k+" dk"}</button>`).join("")}</div>
+    <ul class="small" style="margin:0;padding-left:20px">${items.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>
+    <div class="card soft small" style="margin:0">${rest ? `🛡️ Jüri / sınav modu ${restEnd}'e kadar açık. Bitince ${S.settings.pace||45} dk tempona kendiliğinden dönersin. <button class="btn ghost sm" data-unrest>Şimdi çık</button>`
+      : `🛡️ <b>Jüri ya da sınav haftası mı?</b> Hedefi 2 dakikaya indir, seri bozulmasın: <button class="btn sm" data-rest="7">1 hafta</button> <button class="btn sm" data-rest="14">2 hafta</button>`}</div>
+    <div class="small muted">Toplam çalışma: <b>${Math.round(totalHours())} saat</b> (seviye testine göre başlangıç tahmini ${baseHours()} s + burada ${studiedHours().toFixed(1)} s)</div>
+    ${forecastHTML(S.settings.pace||45, false)}
+    <button class="btn sm" data-fcoach>Bu analizi Claude'la derinleştir</button>
+    <div><div class="between small"><span>Bu hafta</span><span>${wk} / ${p*7} dk</span></div><div class="bar" style="margin-top:6px"><i style="width:${Math.min(100, Math.round(100*wk/(p*7)))}%"></i></div></div>
+    <div class="row"><span class="tiny">Uygulama dışı çalışma ekle:</span>${[15,30,60].map(n=>`<button class="chip" data-ext="${n}">+${n} dk</button>`).join("")}</div>
+    <p class="tiny" style="margin:0">Saatler Cambridge'in yaklaşık tahminleri (sıfırdan B1 ≈ 350–400 saat). Süre, uygulama açıkken ve sen etkileşimdeyken kendiliğinden sayılır. Dizi, kitap ve ders gibi dış çalışmayı elle eklersin. Kesinlik için 6 haftada bir seviye testini tekrarla.</p></div>`;
+}
+
+/* Forecast from real history: logged minutes (empty days count as 0) + lesson speed. "Fully reached" = study hours AND that level's lessons done. */
+const LVN = ["A1","A2","B1","B2","C1"];
+function dateIn(days){ return new Date(addDays(today(), Math.ceil(days))+"T12:00:00").toLocaleDateString("tr-TR",{month:"long",year:"numeric"}); }
+function forecast(planMin){
+  const t = today(), days = []; for(let i=0;i<28;i++) days.push(dayMin(addDays(t,-i)));
+  const activeIdx = days.map((x,i)=>x>0?i:-1).filter(i=>i>=0), active = activeIdx.length;
+  const span = active ? Math.max(7, activeIdx[activeIdx.length-1]+1) : 28;
+  const real = active>=3 ? days.slice(0,span).reduce((a,b)=>a+b,0)/span : null;
+  const w1 = days.slice(0,7).reduce((a,b)=>a+b,0)/7, w2 = days.slice(7,14).reduce((a,b)=>a+b,0)/7;
+  const trend = active>=5 && w2>0 ? (w1>w2*1.25 ? "up" : w1<w2*0.75 ? "down" : "flat") : null;
+  const lessons28 = Object.values(gr().done).filter(d=>d.pass && d.date && d.date>addDays(t,-28)).length;
+  const H = totalHours();
+  const per = real!=null ? real : planMin;
+  const rows = [2,3,4].map(i=>{
+    const hLeft = Math.max(0, LV_HOURS[i]-H), dH = hLeft*60/Math.max(3, per);
+    const lLeft = LESSONS.filter(l=>l.lv<=i && !lessonPassed(l.id)).length;
+    const lRate = lessons28>=2 ? lessons28/28 : Math.max(0.15, per/60*0.5);   // lessons per day; before data: ~1 lesson per 2 h of study
+    const dL = lLeft / lRate, dAll = Math.max(dH, dL);
+    const planH = hLeft*60/Math.max(3, planMin), planAll = Math.max(planH, lLeft / Math.max(lRate, planMin/60*0.5));
+    return {i, lv:LVN[i], hLeft, lLeft, dAll, planAll, limit: dL>dH ? "ders" : "saat", done: hLeft<=0 && lLeft===0};
+  });
+  return {real: real!=null ? Math.round(real) : null, active, span, trend, lessons28, H, per, planMin, rows};
+}
+function forecastHTML(planMin, compact){
+  const F = forecast(planMin), next = F.rows.find(r=>!r.done) || F.rows[2], b2 = F.rows[1];
+  const show = compact ? [...new Set([next, b2])].filter(r=>!r.done) : F.rows.filter(r=>!r.done);
+  const basis = F.real!=null
+    ? `Son ${F.span} günün <b>${F.active}</b> gününde çalıştın; boş günler dahil gerçek ortalaman <b>${F.real} dk/gün</b>, son 4 haftada <b>${F.lessons28}</b> ders geçtin.`
+    : `Henüz 3 günlük verin yok, bu yüzden tahmin seçtiğin <b>${planMin} dk</b>'ya göre. Birkaç gün sonra gerçek verinle hesaplarım.`;
+  const tr = F.trend==="up" ? " Son hafta hızlandın ↑" : F.trend==="down" ? " Son hafta yavaşladın; normal, dönemsel olur." : "";
+  const line = r => { const sooner = F.real!=null && planMin > F.real*1.15 ? Math.round((r.dAll - r.planAll)/30) : 0;
+    return `<div class="between" style="padding:6px 0;border-top:1px solid var(--line);align-items:flex-start;gap:8px"><span><b>${r.lv}${r.i===3?" 🎯":""}</b><span class="tiny" style="display:block">${Math.round(r.hLeft)} saat + ${r.lLeft} ders kaldı</span></span>
+      <span style="text-align:right"><b>${dateIn(r.dAll)}</b>${sooner>=1?`<span class="tiny" style="display:block">her gün ${planMin>=60?(planMin/60+"").replace(".",",")+" saat":planMin+" dk"} yaparsan ≈${dateIn(r.planAll)} (${sooner} ay erken)</span>`:""}${r.limit==="ders"?`<span class="tiny" style="display:block">seni ders hızın sınırlıyor</span>`:""}</span></div>`; };
+  return `<div class="stack" style="gap:6px"><div class="small"><b>📈 Böyle giderse</b></div><div class="small muted">${basis}${tr}</div>${show.map(line).join("")}
+    ${compact?"":`<p class="tiny" style="margin:0">"Tam ulaşmak" = o seviyenin çalışma saatini doldurmak <b>ve</b> o seviyeye kadarki tüm gramer derslerini geçmek. Hangisi daha geç biterse tarih odur. Seviye testini 6 haftada bir tekrarlarsan başlangıç tahmini de düzelir.</p>`}</div>`;
+}
+function forecastText(){
+  const F = forecast(S.settings.pace||45);
+  return `Gerçek ortalamam ${F.real!=null?F.real+" dk/gün (son "+F.span+" günün "+F.active+" günü çalıştım)":"henüz hesaplanamadı"}, seçtiğim tempo ${S.settings.pace||45} dk/gün, toplam tahmini çalışma ${Math.round(F.H)} saat, son 4 haftada ${F.lessons28} ders geçtim. Uygulamanın tahmini: ${F.rows.filter(r=>!r.done).map(r=>`${r.lv} ≈ ${dateIn(r.dAll)} (${Math.round(r.hLeft)} saat + ${r.lLeft} ders kaldı)`).join(", ")}.`;
+}
+function paceClick(e, redraw){
+  const av = e.target.closest("[data-avail]"); if(av){ const d = fd(), n = +av.dataset.avail; d.avail = d.avail===n ? undefined : n; if(d.avail===undefined) delete d.avail; save(); redraw(); return true; }
+  const pc = e.target.closest("[data-pace]"); if(pc){ setPace(+pc.dataset.pace); delete S.settings.rest; save(); redraw(); toast("Tempo: "+PACES[+pc.dataset.pace].n); return true; }
+  const rs = e.target.closest("[data-rest]"); if(rs){ S.settings.rest = addDays(today(), +rs.dataset.rest - 1); save(); redraw(); toast("Jüri modu açık. Günde 2 dk yeter 🛡️"); return true; }
+  if(e.target.closest("[data-fcoach]")){ bridge("Hedef tarih analizi → Claude", P.coach() + "\n\nÖZELLİKLE: Yukarıdaki TEMPO VE TAHMİN satırına bak. Bu tahmin gerçekçi mi? Akademik takvimimi (jüri ve sınav haftaları) hesaba katarak B1 ve B2 için ay ay bir plan çıkar; hangi beceride hızlanabileceğimi söyle.", {save:t=>{ S.coach = S.coach||[]; S.coach.push({date:today(), text:t}); save(); redraw(); }, tip:"Cevabı buraya yapıştırırsan Rehber'de koç notu olarak saklanır."}); return true; }
+  if(e.target.closest("[data-unrest]")){ delete S.settings.rest; save(); redraw(); toast("Tekrar hoş geldin!"); return true; }
+  const ex = e.target.closest("[data-ext]"); if(ex){ addExt(+ex.dataset.ext); redraw(); return true; }
+  return false;
+}
+
 /* ---------- guide (progress review + coach) ---------- */
 const GOALS = [
  {k:"prof", i:"🎓", n:"Hazırlık / proficiency sınavını geçmek", how:"B2 gramer dersleri, sınav kelime paketi, okuma.", a:`<a class="btn sm" href="#gramer">Gramer yol haritası</a>`},
@@ -1558,6 +1678,7 @@ function vGuide(m, sub){
   <div class="card"><div class="tiny">HEDEFİN</div><h3 style="margin:4px 0 10px">B2 (hazırlık / proficiency) → sonra C1</h3>
    <div class="road">${["A1","A2","B1","B2","C1"].map((l,i)=>{ const [a,b] = T.byLv[i]; return `<div class="${i===ph?"cur":""}"><div class="bar"><i style="width:${Math.round(100*a/b)}%"></i></div><b>${l}${i===3?" 🎯":""}</b><span>${a}/${b} ders</span></div>`; }).join("")}</div>
    <p class="small muted" style="margin:10px 0 0">Şu an <b>${LVTAG[ph]}</b> aşamasındasın.${nl?` Sıradaki ders: ${esc(nl.t)}.`:""}</p></div>
+  ${paceCard(false)}
   <h2>Bu hafta</h2>
   <div class="grid2"><div class="stat"><b>${w.days}/7</b><span>çalıştığın gün</span></div><div class="stat"><b>${w.cards}</b><span>kart tekrarı</span></div>
    <div class="stat"><b>${w.acc==null?"–":"%"+w.acc}</b><span>gramer isabeti (${w.q} soru)</span></div><div class="stat"><b>${w.sent}</b><span>yazdığın cümle</span></div></div>
@@ -1577,6 +1698,7 @@ function vGuide(m, sub){
   <p class="tiny" style="text-align:center"><a href="#kaynak" style="color:inherit">📚 Kaynak rafı</a> · <a href="#rehber/ayar" style="color:inherit">Seviye testi ve ayarlar</a></p>`;
   bindGuideSeg(m);
   m.onclick = e=>{
+    if(paceClick(e, ()=>vGuide(m))) return;
     if(e.target.closest("[data-coach]")){ bridge("İlerleme raporu → Claude", P.coach(), {save:t=>{ S.coach = S.coach||[]; S.coach.push({date:today(), text:t}); save(); vGuide(m); }, tip:"Claude'un cevabını kopyalayıp buraya yapıştır, Rehber'de saklanır. Haftada bir yapman yeterli."}); return; }
     const gk = e.target.closest("[data-gk]"); if(gk){ const s = new Set(S.goals || GOALS.map(g=>g.k)); s.has(gk.dataset.gk) ? s.delete(gk.dataset.gk) : s.add(gk.dataset.gk); S.goals = [...s]; save(); vGuide(m); return; }
     const g = e.target.closest("[data-goal]"); if(g){ const k = g.dataset.goal; bridge({sunum:"Sunum provası", mulakat:"Mülakat provası", staj:"Staj başvurusu"}[k], P[k](), {tip:"Claude mobil uygulamasında ses moduyla yaparsan gerçek provaya çok yaklaşır."}); }
@@ -1793,7 +1915,8 @@ function vToday(m){
   for(let i=0;i<7;i++){ const day = addDays(mon,i); const dd = S.done[day]||{}; const any = dd.cards||dd.main||dd.write||dd.gram||dd.ladder; if(any) count++;
     week += `<div>${DOW[(i+1)%7]}<span class="${any?"done":""} ${day===t?"today":""}">${any?ICON.check:new Date(day+"T12:00:00").getDate()}</span></div>`; }
   const y1 = S.done[addDays(t,-1)]||{}, y2 = S.done[addDays(t,-2)]||{};
-  const missed2 = !(y1.cards||y1.gram||y1.main) && !(y2.cards||y2.gram||y2.main) && S.testDate && S.testDate < addDays(t,-1);
+  const missed2 = !resting() && !(y1.cards||y1.gram||y1.main) && !(y2.cards||y2.gram||y2.main) && S.testDate && S.testDate < addDays(t,-1);
+  const tiny = pace() <= 5;
   const hello = new Date().getHours()<12 ? "Günaydın" : new Date().getHours()<18 ? "İyi günler" : "İyi akşamlar";
   const lastCoach = (S.coach||[]).slice(-1)[0], coachDue = (!lastCoach || lastCoach.date <= addDays(t,-7)) && weekStats().days>=3;
   m.innerHTML = `<div class="tiny">${new Date().toLocaleDateString("tr-TR",{weekday:"long",day:"numeric",month:"long"})}</div>
@@ -1805,16 +1928,17 @@ function vToday(m){
      <span style="flex:1;min-width:0"><b>${s.ic} ${s.n}</b><span class="small muted" style="display:block">${esc(s.d)}</span></span><span class="tiny">${s.min} dk</span></a>`).join("")}</div>
    ${allDone ? `<div class="small muted" style="margin-top:8px">Yarın: ${esc((nextLesson()||{}).t || "tekrar günü")}. İstersen aşağıdaki bonus görevi yap.</div>`
      : `<button class="btn primary block" data-flow style="margin-top:10px">${cur===0 && !steps.some(s=>s.done) ? "Başla" : "Devam et"} → ${steps[cur].n}</button>
-        <p class="tiny" style="text-align:center;margin:6px 0 0">Bir adım bitince uygulama seni kendiliğinden sıradakine geçirir.</p>`}</div>
+        <p class="tiny" style="text-align:center;margin:6px 0 0">${tiny ? "Bugün yoğunsun: sadece 2 dk kart da yeter, ders yarına kalabilir." : "Bir adım bitince uygulama seni kendiliğinden sıradakine geçirir."}</p>`}</div>
+  ${paceCard(true)}
   ${coachDue ? `<a class="card between" href="#rehber" style="text-decoration:none;color:inherit"><div><h3 style="margin:0">🧑‍🏫 Haftalık değerlendirme zamanı</h3><div class="small muted">Rehber'de raporunu Claude'a gönder, detaylı geri bildirim ve gelecek haftanın planını al.</div></div>›</a>` : ""}
   <div class="card"><div class="between" style="margin-bottom:10px"><h3 style="margin:0">Bu hafta</h3><span class="tag acc">${count}/6 gün</span></div><div class="week">${week}</div></div>
-  <div class="card task"><button class="tick ${d.main?"on":""}" data-tick="main" aria-label="Bonus görevi tamamlandı işaretle">${ICON.check}</button>
+  ${tiny ? "" : `<div class="card task"><button class="tick ${d.main?"on":""}" data-tick="main" aria-label="Bonus görevi tamamlandı işaretle">${ICON.check}</button>
     <div class="body"><div class="between"><h3>${task.icon} Bonus: ${esc(task.title)}</h3><span class="tiny">${task.min} dk · isteğe bağlı</span></div>
     <ol class="small">${task.steps.map(s=>`<li>${s}</li>`).join("")}</ol>
-    <div class="row">${task.actions}</div></div></div>
-  <div class="card"><div class="between"><div><h3 style="margin:0">Bugün hiç vaktin yok mu?</h3><div class="small muted">2 dakikalık mini versiyon: sadece 5 kart. Zinciri kırmamaya yeter.</div></div><a class="btn" href="#kelime/mini">2 dk</a></div></div>
+    <div class="row">${task.actions}</div></div></div>`}
   <p class="tiny" style="text-align:center;margin-top:18px"><a href="#rehber/ayar" style="color:inherit">☁️ <span data-sync-text>${esc(Sync.text())}</span></a></p>`;
   m.onclick = e=>{
+    if(paceClick(e, ()=>vToday(m))) return;
     if(e.target.closest("[data-flow]") || e.target.closest("[data-step]")){ e.preventDefault(); const i = e.target.closest("[data-step]") ? +e.target.closest("[data-step]").dataset.step : cur; setFlow(true); location.hash = steps[i].href; return; }
     const tk = e.target.closest("[data-tick]");
     if(tk){ S.done[t] = Object.assign({}, S.done[t]); S.done[t].main = !S.done[t].main; save(); vToday(m); if(S.done[t].main) toast("Tamamlandı ✓"); return; }
@@ -2304,7 +2428,7 @@ function vMe(m){
   <h2>Seviyeler ne demek?</h2>
   <div class="card small" style="padding:6px 18px">
    ${[["A1","Temel kalıplar: kendini tanıtmak, basit sorular."],["A2","Günlük işleri halletmek: alışveriş, yol, kısa mesajlar."],["B1","Seyahatte rahat, deneyim anlatabilen, bağımsız kullanıcı. Çoğu staj ve değişim programı en az bunu ister."],["B2","Akıcı sohbet, fikir savunma, iş ve okulda rahat çalışma. Yurtdışı yüksek lisans genelde B2–C1 (IELTS 6.5 civarı) ister."],["C1","İncelikli, akademik ve profesyonel kullanım."]].map(([a,b],i)=>`<div style="padding:8px 0;${i?"border-top:1px solid var(--line)":""}"><b>${a}</b> <span class="muted">${b}</span></div>`).join("")}</div>
-  <p class="tiny">Kabaca bir sonraki seviyeye geçmek, günde 15–20 dakikayla 4–6 ay sürer. Başlangıç seviyeleri daha hızlı geçer.</p>
+  <p class="tiny">Gerçekçi tahmin: sıfırdan B1'e yaklaşık 350–400 saat çalışma gerekir (günde 45 dk ≈ 1–1,5 yıl, kamp temposu ≈ 3–4 ay). Kendi tarihlerini Rehber'deki tempo kartında görebilirsin.</p>
   <h2>Verilerim</h2>
   <div class="card stack"><div class="between" style="align-items:flex-start"><div><h3 style="margin:0">☁️ Google Drive eşitlemesi</h3><div class="small muted" data-sync-text>${esc(Sync.text())}</div></div></div>
    <p class="small muted" style="margin:0">İlerlemen kendi Google Drive'ında, sadece bu uygulamanın görebildiği gizli bir klasörde saklanır. Telefonda ve bilgisayarda aynı Google hesabıyla bağlan; ikisi de aynı verileri görür. Bir cihazda internet yoksa, bağlanınca kendiliğinden eşitlenir.</p>
