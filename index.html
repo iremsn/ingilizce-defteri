@@ -793,6 +793,7 @@ function mergeState(L, R){
   if(R.coach) M.coach = byKey([...(M.coach||[]), ...R.coach], c=>c.date+"|"+c.text.slice(0,40));
   if(R.log){ M.log = M.log || {}; for(const [d,o] of Object.entries(R.log)){ const a = M.log[d] || {}; Object.keys(o).forEach(k=>a[k] = Math.max(a[k]||0, o[k]||0)); M.log[d] = a; } }
   if(newer===R && R.goals) M.goals = R.goals;
+  M.miles = Object.assign({}, R.miles||{}, L.miles||{});
   M.grammarDone = [...new Set([...(L.grammarDone||[]), ...(R.grammarDone||[])])];
   M.journal = byKey([...(R.journal||[]), ...(L.journal||[])], j=>j.id).sort((a,b)=>a.id-b.id);
   if(R.wr){
@@ -1228,7 +1229,7 @@ function flowNext(m, k){
   m.innerHTML = `<div style="text-align:center;padding-top:20px">
     <div class="big-ok">${ICON.check.replace('width="16" height="16"','width="40" height="40"')}</div>
     <h1>${cur ? cur.n : ""} tamam!</h1>
-    <p class="sub">Sıradaki adım ${st.indexOf(nx)+1}/3</p>
+    <p class="sub">${pick(PRAISE)}<br>Sıradaki adım ${st.indexOf(nx)+1}/3</p>
     <div class="card" style="text-align:left"><div class="tiny">SIRADAKİ</div><h3 style="margin:4px 0">${nx.ic} ${nx.n}</h3><div class="small muted">${esc(nx.d)}</div>
     <div class="bar auto" style="margin-top:12px"><i></i></div></div>
     <button class="btn primary block" data-go>Devam et →</button>
@@ -1566,7 +1567,8 @@ function paceCard(compact){
     <div class="between"><h3 style="margin:0">${rest&&!avail?`🛡️ Jüri / sınav modu · ${restEnd}'e kadar`:`⏱️ Bugünkü hedef: ${p>=60?(p/60).toString().replace(".",",")+" saat":p+" dk"}`}</h3><span class="tag ${today_m>=p?"ok":"acc"}">${today_m} dk</span></div>
     <div class="bar" style="margin:10px 0 8px"><i style="width:${Math.min(100, Math.round(100*today_m/p))}%"></i></div>
     <ul class="small" style="margin:0 0 8px;padding-left:20px">${items.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>
-    <div style="margin:4px 0 12px">${forecastHTML(rest&&!avail ? (S.settings.pace||45) : p, true)}</div>
+    ${(()=>{ const lp = levelProgress(); return lp ? `<div class="small" style="margin:4px 0 6px"><b>🧭 ${lp.lv} yolunun %${lp.pct}'ini geçtin.</b>${lp.wkH>=0.1?` Bu hafta ${lp.wkH.toFixed(1).replace(".",",")} saat çalıştın; bu, ${lp.lv} yolunun %${String(lp.wkPct).replace(".",",")}'i demek.`:""}</div><div class="bar" style="margin-bottom:8px"><i style="width:${lp.pct}%"></i></div>` : ""; })()}
+    <details style="margin:0 0 12px"><summary class="small">📈 Böyle giderse ne zaman? (gerçek verinle tahmin)</summary><div style="margin-top:8px">${forecastHTML(rest&&!avail ? (S.settings.pace||45) : p, true)}</div></details>
     ${p<=5 ? `<div class="row" style="margin-bottom:8px"><a class="btn sm" href="#kelime/mini">2 dk kartlar</a>${rest?`<button class="btn ghost sm" data-unrest>Jüri modundan çık</button>`:""}</div>` : ""}
     <div class="row"><span class="tiny">Uygulama dışında çalıştın mı? (dizi, kitap, ders)</span>${[10,20,30].map(n=>`<button class="chip" data-ext="${n}">+${n} dk</button>`).join("")}</div></div>`;
   return `<div class="card stack"><div class="between"><h3 style="margin:0">⏱️ Tempo ve hedef tarihler</h3><span class="tag acc">${rest?"Jüri modu":PACES[p].n}</span></div>
@@ -1616,13 +1618,43 @@ function forecastHTML(planMin, compact){
     return `<div class="between" style="padding:6px 0;border-top:1px solid var(--line);align-items:flex-start;gap:8px"><span><b>${r.lv}${r.i===3?" 🎯":""}</b><span class="tiny" style="display:block">${Math.round(r.hLeft)} saat + ${r.lLeft} ders kaldı</span></span>
       <span style="text-align:right"><b>${dateIn(r.dAll)}</b>${sooner>=1?`<span class="tiny" style="display:block">her gün ${planMin>=60?(planMin/60+"").replace(".",",")+" saat":planMin+" dk"} yaparsan ≈${dateIn(r.planAll)} (${sooner} ay erken)</span>`:""}${r.limit==="ders"?`<span class="tiny" style="display:block">seni ders hızın sınırlıyor</span>`:""}</span></div>`; };
   return `<div class="stack" style="gap:6px"><div class="small"><b>📈 Böyle giderse</b></div><div class="small muted">${basis}${tr}</div>${show.map(line).join("")}
-    ${compact?"":`<p class="tiny" style="margin:0">"Tam ulaşmak" = o seviyenin çalışma saatini doldurmak <b>ve</b> o seviyeye kadarki tüm gramer derslerini geçmek. Hangisi daha geç biterse tarih odur. Seviye testini 6 haftada bir tekrarlarsan başlangıç tahmini de düzelir.</p>`}</div>`;
+    ${compact?"":`<p class="tiny" style="margin:0">Bu tarihler bir söz ya da baskı değil, bir pusula. Her çalıştığın gün tarih biraz öne gelir. "Tam ulaşmak" = o seviyenin çalışma saatini doldurmak <b>ve</b> o seviyeye kadarki tüm gramer derslerini geçmek. Hangisi daha geç biterse tarih odur. Seviye testini 6 haftada bir tekrarlarsan başlangıç tahmini de düzelir.</p>`}</div>`;
 }
 function forecastText(){
   const F = forecast(S.settings.pace||45);
   return `Gerçek ortalamam ${F.real!=null?F.real+" dk/gün (son "+F.span+" günün "+F.active+" günü çalıştım)":"henüz hesaplanamadı"}, seçtiğim tempo ${S.settings.pace||45} dk/gün, toplam tahmini çalışma ${Math.round(F.H)} saat, son 4 haftada ${F.lessons28} ders geçtim. Uygulamanın tahmini: ${F.rows.filter(r=>!r.done).map(r=>`${r.lv} ≈ ${dateIn(r.dAll)} (${Math.round(r.hLeft)} saat + ${r.lLeft} ders kaldı)`).join(", ")}.`;
 }
+/* ---------- motivation helpers: mood check-in, never-resetting day count, why-reminder, progress-first framing ---------- */
+const MOODS = [["yorgun","😴 Yorgunum","Yorgunken 2 dakika bile sayılır. Sadece kartları aç; istersen orada bırak, bugün bu kadarı yeter."],
+  ["idare","😐 İdare eder","Sadece ilk adımı yap. Başlayınca çoğu zaman devamı gelir; gelmezse de sorun değil, ilk adım yine sayılır."],
+  ["iyi","🙂 İyiyim","Güzel! Enerjin varsa bugün bonus görev için iyi bir gün."],
+  ["zor","🌧️ Zor bir gün","Bugün kendine nazik ol. İngilizce yarın da burada. İstersen sadece bir İngilizce şarkı dinle, o da sayılır."]];
+const PRAISE = ["Yıllarca kaçtığın şeyi şu an yapıyorsun. Bu küçük bir şey değil.","Beyin tekrarla öğrenir; şu an tam olarak onu yapıyorsun.","Hata yapmak bilgi demek. Her yanlış bir sonrakini kolaylaştırır.","Motivasyon çoğu zaman başladıktan sonra gelir. Sen başladın bile.","Bugünkü sen, dünkü senden bir adım önde.","Mükemmel olmak zorunda değil, sadece devam etmek yeter.","Küçük adımlar birikir: günde 20 dk bir yılda 120 saat eder."];
+const DAILY = ["Bugünün tek görevi: uygulamayı açmak. Onu yaptın bile. ✓","Zor gelirse sadece 2 dakika yap; 2 dakika da zinciri tutar.","Seviye atlamak düz bir çizgi değil. Bazı haftalar yavaş geçer; bu normal.","Dizi izlerken duyduğun tek bir kelimeyi tanımak bile ilerleme demek.","İngilizceyi sevmek zorunda değilsin, sadece biraz alışman yeter.","Bir kelimeyi unutman öğrenmenin parçası. Kart onu yine karşına çıkaracak.","Kendini dünkü hâlinle kıyasla, başkalarıyla değil."];
+const MILES = [
+  ["d1","🌱","İlk gün", s=>s.days>=1], ["d3","🔥","3 gün", s=>s.days>=3], ["d7","⭐","1 hafta çalıştın", s=>s.days>=7], ["d14","🌟","14 gün", s=>s.days>=14],
+  ["d30","🏅","30 gün", s=>s.days>=30], ["d60","🏆","60 gün", s=>s.days>=60], ["d100","💎","100 gün", s=>s.days>=100],
+  ["l1","🧩","İlk gramer dersi", s=>s.les>=1], ["l5","📘","5 ders", s=>s.les>=5], ["l10","📗","10 ders", s=>s.les>=10], ["l24","🎓","B1'e kadar tüm dersler", s=>s.les>=24], ["l36","🎯","B2 dersleri tamam", s=>s.les>=36],
+  ["w25","🗂️","25 kelime iyi biliyorsun", s=>s.known>=25], ["w100","📚","100 kelime", s=>s.known>=100], ["w300","🧠","300 kelime", s=>s.known>=300],
+  ["s10","✍️","İlk 10 cümle", s=>s.sent>=10], ["s100","📝","100 cümle", s=>s.sent>=100], ["h10","⏱️","10 saat çalışma", s=>s.hrs>=10], ["h50","⌛","50 saat çalışma", s=>s.hrs>=50]];
+function mileStats(){ let sent = 0; Object.values(S.log||{}).forEach(l=>sent += l.sent||0);
+  return {days: studyDays(), les: LESSONS.filter(l=>lessonPassed(l.id)).length, known: Object.values(S.cards).filter(c=>c.box>=3).length, sent, hrs: studiedHours()}; }
+function newMiles(){ const st = mileStats(), seen = S.miles = S.miles || {}; const got = MILES.filter(m=>m[3](st) && !seen[m[0]]); got.forEach(m=>seen[m[0]] = today()); if(got.length) save(); return got; }
+function badgesHTML(){ const seen = S.miles||{}; return `<div class="row">${MILES.map(m=>`<span class="chip" title="${esc(m[2])}" style="${seen[m[0]]?"":"opacity:.35;filter:grayscale(1)"}">${m[1]} ${esc(m[2])}</span>`).join("")}</div>`; }
+function studyDays(){ const s = new Set(); Object.entries(S.done||{}).forEach(([d,v])=>{ if(v && (v.cards||v.gram||v.ladder||v.main||v.write)) s.add(d); }); Object.entries(S.log||{}).forEach(([d,v])=>{ if(v && ((v.min||0)>=2 || v.ext || v.cards)) s.add(d); }); return s.size; }
+function whyLine(){ const g = (S.goals || GOALS.map(x=>x.k)).map(k=>GOALS.find(x=>x.k===k)).filter(Boolean); if(!g.length) return ""; const x = g[new Date().getDate() % g.length]; return `${x.i} Neden buradasın: <b>${esc(x.n)}</b>`; }
+function levelProgress(){ const H = totalHours(), i = LV_HOURS.findIndex(h=>h>H); if(i<0) return null; const lo = i ? LV_HOURS[i-1] : 0;
+  let wk = 0; for(let k=0;k<7;k++) wk += dayMin(addDays(today(),-k));
+  return {lv: LVN[i], pct: Math.max(1, Math.round(100*(H-lo)/(LV_HOURS[i]-lo))), wkH: wk/60, wkPct: Math.round(1000*wk/60/(LV_HOURS[i]-lo))/10}; }
+function moodCard(){
+  const d = S.done[today()]||{}, mo = MOODS.find(x=>x[0]===d.mood), days = studyDays(), why = whyLine();
+  return `<div class="card"><div class="small" style="margin-bottom:6px"><b>Bugün nasılsın?</b></div>
+    <div class="row">${MOODS.map(([k,l])=>`<button class="chip" data-mood="${k}" aria-pressed="${d.mood===k}">${l}</button>`).join("")}</div>
+    <p class="small" style="margin:10px 0 0">${mo ? mo[2] : "💬 " + DAILY[(new Date().getDate() + new Date().getMonth()) % DAILY.length]}</p>
+    <div class="small muted" style="margin-top:10px">${days ? `Toplam <b>${days} gün</b> çalıştın. Bu sayı hiç sıfırlanmaz; ara versen de kazandığın senin.` : `İlk günün! Bugün yaptığın her şey sayılır.`}${why?`<br>${why}`:""}</div></div>`;
+}
 function paceClick(e, redraw){
+  const md = e.target.closest("[data-mood]"); if(md){ const d = fd(), k = md.dataset.mood; d.mood = d.mood===k ? undefined : k; if(!d.mood) delete d.mood; if((k==="yorgun"||k==="zor") && d.mood && !d.avail) d.avail = 5; save(); redraw(); return true; }
   const av = e.target.closest("[data-avail]"); if(av){ const d = fd(), n = +av.dataset.avail; d.avail = d.avail===n ? undefined : n; if(d.avail===undefined) delete d.avail; save(); redraw(); return true; }
   const pc = e.target.closest("[data-pace]"); if(pc){ setPace(+pc.dataset.pace); delete S.settings.rest; save(); redraw(); toast("Tempo: "+PACES[+pc.dataset.pace].n); return true; }
   const rs = e.target.closest("[data-rest]"); if(rs){ S.settings.rest = addDays(today(), +rs.dataset.rest - 1); save(); redraw(); toast("Jüri modu açık. Günde 2 dk yeter 🛡️"); return true; }
@@ -1690,6 +1722,7 @@ function vGuide(m, sub){
   <h2>Toplam ilerleme</h2>
   <div class="grid2"><div class="stat"><b>${T.known}</b><span>iyi bildiğin günlük kelime</span></div><div class="stat"><b>${S.pack?`${T.packKnown}/${T.packTotal}`:"–"}</b><span>sınav kelimesi (iyi biliyor/toplam)</span></div>
    <div class="stat"><b>${T.byLv.reduce((s,[a])=>s+a,0)}/${LESSONS.length}</b><span>gramer dersi</span></div><div class="stat"><b>${T.writings}</b><span>yazı ve cümle seti</span></div></div>
+  <h2>Rozetlerin</h2><div class="card">${badgesHTML()}<p class="tiny" style="margin:8px 0 0">Rozetler hiç geri alınmaz. Ara versen de kazandıkların seninle kalır.</p></div>
   ${T.weak.length||T.lapsed.length ? `<h2>Zorlandığın yerler</h2><div class="card">
    ${T.weak.map(x=>`<a class="lrow" href="#gramer/${x.l.id}"><span class="st due">↻</span><span style="flex:1">${esc(x.l.t)}</span><span class="tiny">%${x.best}</span></a>`).join("")}
    ${T.lapsed.length?`<div class="small" style="padding-top:8px">Sık unuttuğun kelimeler: <span lang="en">${T.lapsed.map(x=>`<b>${esc(x.en)}</b> (${esc(x.tr)})`).join(", ")}</span></div>`:""}</div>` : ""}
@@ -1915,14 +1948,17 @@ function vToday(m){
   for(let i=0;i<7;i++){ const day = addDays(mon,i); const dd = S.done[day]||{}; const any = dd.cards||dd.main||dd.write||dd.gram||dd.ladder; if(any) count++;
     week += `<div>${DOW[(i+1)%7]}<span class="${any?"done":""} ${day===t?"today":""}">${any?ICON.check:new Date(day+"T12:00:00").getDate()}</span></div>`; }
   const y1 = S.done[addDays(t,-1)]||{}, y2 = S.done[addDays(t,-2)]||{};
-  const missed2 = !resting() && !(y1.cards||y1.gram||y1.main) && !(y2.cards||y2.gram||y2.main) && S.testDate && S.testDate < addDays(t,-1);
-  const tiny = pace() <= 5;
+  const lm = d => ((S.log||{})[d]||{}).min >= 2 || ((S.log||{})[d]||{}).ext;
+  const missed2 = !resting() && !(y1.cards||y1.gram||y1.main||lm(addDays(t,-1))) && !(y2.cards||y2.gram||y2.main||lm(addDays(t,-2))) && S.testDate && S.testDate < addDays(t,-1);
+  const tiny = pace() <= 5, miles = newMiles();
   const hello = new Date().getHours()<12 ? "Günaydın" : new Date().getHours()<18 ? "İyi günler" : "İyi akşamlar";
   const lastCoach = (S.coach||[]).slice(-1)[0], coachDue = (!lastCoach || lastCoach.date <= addDays(t,-7)) && weekStats().days>=3;
   m.innerHTML = `<div class="tiny">${new Date().toLocaleDateString("tr-TR",{weekday:"long",day:"numeric",month:"long"})}</div>
   <h1>${hello}</h1>
   <p class="sub">${allDone ? "Bugünün dersini bitirdin. Harika iş! 🎉" : "Bugün ne yapacağını düşünme, sırayla git. Yaklaşık 18 dakika."}</p>
-  ${missed2 ? `<div class="card soft small">İki gündür ara verdin, sorun değil. Bugün sadece ilk adımı yapsan bile zinciri yeniden başlatmış olursun.</div>`:""}
+  ${miles.length ? `<div class="card" style="text-align:center"><div style="font-size:40px">${miles.map(x=>x[1]).join(" ")}</div><h3 style="margin:6px 0 2px">Yeni rozet${miles.length>1?"ler":""}: ${miles.map(x=>esc(x[2])).join(", ")}</h3><div class="small muted">${pick(PRAISE)}</div></div>` : ""}
+  ${missed2 ? `<div class="card soft small">Tekrar hoş geldin 💜 Ara vermek öğrenmenin parçası. Bugün sadece ilk adımı yapsan bile kaldığın yerden devam etmiş olursun.</div>`:""}
+  ${moodCard()}
   <div class="card"><div class="between"><h3 style="margin:0">📘 Bugünkü dersin</h3><span class="tag acc">${allDone?"bitti":`adım ${cur+1}/3`}</span></div>
    <div class="steps">${steps.map((s,i)=>`<a class="sr ${i===cur?"cur":""}" href="${s.href}" data-step="${i}" style="text-decoration:none;color:inherit"><span class="dot ${s.done?"on":""}">${s.done?ICON.check:i+1}</span>
      <span style="flex:1;min-width:0"><b>${s.ic} ${s.n}</b><span class="small muted" style="display:block">${esc(s.d)}</span></span><span class="tiny">${s.min} dk</span></a>`).join("")}</div>
