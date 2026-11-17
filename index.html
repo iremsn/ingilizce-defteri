@@ -69,6 +69,10 @@ textarea,input.f{width:100%;border:0;background:var(--fill-2);border-radius:var(
 textarea:focus,input.f:focus{outline:0;box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 35%,transparent);background:var(--surface)}
 .tabbar{position:fixed;left:0;right:0;bottom:0;z-index:50;background:var(--glass);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-top:1px solid var(--line);padding:6px 8px max(8px,env(safe-area-inset-bottom))}
 .tabbar nav{max-width:560px;margin:0 auto;display:flex}
+.tabbar .nextbar,.tabbar a.nextbar{display:flex;flex-direction:row;align-items:center;gap:10px;max-width:560px;margin:0 auto 6px;padding:11px 14px;border-radius:14px;background:var(--accent);color:#fff;text-decoration:none;font-weight:700;font-size:14px;line-height:1.3;flex:none}
+.tabbar .nextbar.here{background:var(--bg);color:var(--ink);border:1px solid var(--line);font-weight:500;font-size:13px}
+.tabbar .nextbar.here a{display:inline;color:var(--accent);font-size:13px;padding:0;flex:none}
+body.hasnext .app{padding-bottom:calc(150px + env(safe-area-inset-bottom,0px))}
 .tabbar a{flex:1;text-decoration:none;color:var(--ink-3);display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;font-weight:600;padding:4px 0}
 .tabbar a svg{width:24px;height:24px}
 .tabbar a[aria-current=page]{color:var(--accent)}
@@ -1222,21 +1226,34 @@ function todaySteps(){
   const L = lessonById(d.lesson);
   const nCards = dueCards().length + Math.min(newLeftToday(), newPool().length) + Math.min(packNewLeft(), packPool().length);
   const wl = d.gplan==="new" ? L : lessonById(lastPassed()||"") || L;
-  return [
+  const steps = [
     {k:"cards", n:"Kelime", ic:"🗂️", min:5, d: nCards ? `${nCards} kart: tekrarlar ve yeni kelimeler` : "Bugünlük kart kalmadı", href:"#kelime/akis", done: !!d.cards || !nCards},
     {k:"gram", n:"Gramer", ic:"🧩", min:8, d: d.gplan==="rev" ? `Tekrar: ${dueLessons().length} eski ders (kalıcı olsun diye)` : L ? L.t : "Tüm dersler bitti, serbest tekrar", href: d.gplan==="rev" ? "#gramer/tekrar" : L ? "#gramer/"+L.id : "#gramer", done: !!d.gram || d.gplan==="none"},
     {k:"write", n:"Cümle kur", ic:"✍️", min:5, d: wl ? `"${wl.t.split(":")[0]}" ile 3 basamakta 3 cümle` : "Kendi cümlelerin", href: wl ? "#cumle/"+wl.id : "#pratik/yaz", done: !!d.ladder}
   ];
+  // 4th step: one task from this week's book table, only on days with 45+ minutes
+  if(typeof game==="function" && pace()>=45){
+    const g = game(), its = weekItems(g.stage, g.week), item = its.find(x=>!g.done[x.k]), bookToday = Object.values(g.done).some(e=>e.d===today());
+    if(item || bookToday) steps.push({k:"book", n:"Kitap", ic:"📕", min: pace()>=90 ? 25 : 15,
+      d: bookToday ? "Bugünkü kitap görevin tamam" : item.href ? `${item.l} · kitapta çöz, sonra ders sayfasının altındaki "Kitapta bitirdim"e dokun` : `${item.l} · bitirince Oyun sayfasında kutucuğu işaretle`, href: item && item.href ? item.href : "#oyun", done: bookToday || !!d.book});
+  }
+  return steps;
 }
+// Called when any daily step finishes, from anywhere in the app (not only inside the guided flow):
+// marks it done and moves on to the next step, so the user never has to find the next page alone.
 function flowNext(m, k){
-  fd()[k==="cards"?"cards":k==="gram"?"gram":"ladder"] = true; save();
-  if(!flowOn()) return false;
+  const flag = {cards:"cards", gram:"gram", write:"ladder", book:"book"}[k];
+  const wasDone = k==="book" ? (!!fd().book || Object.values(game().done).filter(e=>e.d===today()).length > 1) : !!fd()[flag];
+  fd()[flag] = true; save();
+  if(wasDone && !flowOn()) return false;          // extra practice after the step was already done: normal end screen
   const st = todaySteps(), nx = st.find(s=>!s.done), cur = st.find(s=>s.k===k);
-  if(!nx){ setFlow(false); location.hash = "#bugun"; toast("Bugünün dersi bitti 🎉"); return true; }
+  const nb = document.getElementById("nextbar"); if(nb) nb.remove();
+  if(!nx){ setFlow(false); location.hash = "#bugun"; toast("Bugünün planı bitti 🎉"); return true; }
+  setFlow(true);
   m.innerHTML = `<div style="text-align:center;padding-top:20px">
     <div class="big-ok">${ICON.check.replace('width="16" height="16"','width="40" height="40"')}</div>
     <h1>${cur ? cur.n : ""} tamam!</h1>
-    <p class="sub">${pick(PRAISE)}<br>Sıradaki adım ${st.indexOf(nx)+1}/3</p>
+    <p class="sub">${pick(PRAISE)}<br>Sıradaki adım ${st.indexOf(nx)+1}/${st.length}</p>
     <div class="card" style="text-align:left"><div class="tiny">SIRADAKİ</div><h3 style="margin:4px 0">${nx.ic} ${nx.n}</h3><div class="small muted">${esc(nx.d)}</div>
     <div class="bar auto" style="margin-top:12px"><i></i></div></div>
     <button class="btn primary block" data-go>Devam et →</button>
@@ -1353,8 +1370,7 @@ function vGPEnd(m){
     if(GP.mode==="rev"){ const by = {}; keys.forEach(k=>{ const id = k.split(":")[0]; by[id] = by[id] || [0,0]; by[id][1]++; if(GP.first[k]) by[id][0]++; });
       Object.entries(by).forEach(([id,[a,b]])=>{ const d = gr().done[id]; if(!d) return; if(a/b>=0.7){ d.step = Math.min(GR_INT.length-1, (d.step||0)+1); d.due = addDays(today(), GR_INT[d.step]); } else { d.step = 0; d.due = addDays(today(), 1); } d.date = today(); }); }
     save();
-    if(GP.mode!=="syn" && flowOn()){ toast(`%${pct} · ${GP.mode==="rev" ? "tekrar tamam" : passNow ? "ders tamam ✓" : "bu ders yarın tekrar gelecek"}`); if(flowNext(m, "gram")){ GP = null; return; } }
-    else if(GP.mode!=="syn") { fd().gram = true; save(); }
+    if(GP.mode!=="syn" && flowNext(m, "gram")){ toast(`%${pct} · ${GP.mode==="rev" ? "tekrar tamam" : passNow ? "ders tamam ✓" : "bu ders yarın tekrar gelecek"}`); GP = null; return; }
   }
   const msg = pct>=90 ? "Harika! Bu konu oturmuş görünüyor." : pct>=70 ? "Güzel, ders tamam. Ufak hatalar öğrenmenin parçası." : "Bu konu biraz daha zaman istiyor. Bu çok normal; formüle tekrar bak, sonra bir daha dene. Yarın da karşına çıkacak.";
   m.innerHTML = `<div style="text-align:center;padding-top:10px"><div class="big-ok" style="${pct<70?"background:var(--warn)":""}">${pct<70?"↻":ICON.check.replace('width="16" height="16"','width="40" height="40"')}</div>
@@ -1425,8 +1441,7 @@ function vLadderEnd(m, L){
     S.journal.push(entry); LD.entry = entry.id;
     wr().sentences = (wr().sentences||0) + sents.length; logAdd("sent", sents.length);
     markWrite(); save();
-    if(flowOn() && flowNext(m, "write")){ return; }
-    fd().ladder = true; save();
+    if(flowNext(m, "write")){ return; }
   }
   m.innerHTML = `<div style="text-align:center;padding-top:10px"><div class="big-ok">${ICON.check.replace('width="16" height="16"','width="40" height="40"')}</div><h1>3 cümle yazdın</h1><p class="sub">Defterine kaydettim.</p></div>
   <div class="card" lang="en">${sents.map(x=>`<div style="padding:6px 0">${esc(x)}</div>`).join("")}</div>
@@ -1611,13 +1626,13 @@ function addExt(n){ logAdd("ext", n); save(); toast(`+${n} dk eklendi`); }
 let LAST_ACT = Date.now(), ACT_TICK = 0;
 ["pointerdown","keydown","touchstart","scroll"].forEach(ev=>addEventListener(ev, ()=>{ LAST_ACT = Date.now(); }, {passive:true}));
 setInterval(()=>{ if(S.onboarded && document.visibilityState==="visible" && Date.now()-LAST_ACT < 90000){ logAdd("min", 0.5); saveLocal(); if(++ACT_TICK % 6 === 0) save(); } }, 30000);
-function paceCard(compact){
+function paceCard(compact, noAvail){
   const p = compact ? pace() : basePace(), today_m = Math.round(dayMin(today())), wk = weekMin(), avg = recentAvg(), rest = resting(), avail = (S.done[today()]||{}).avail;
   const items = compact ? itemsFor(p) : rest ? REST_ITEMS : PACES[p].items;
   const restEnd = rest ? new Date(S.settings.rest+"T12:00:00").toLocaleDateString("tr-TR",{day:"numeric",month:"long"}) : "";
   if(compact) return `<div class="card ${rest&&!avail?"soft":""}">
-    <div class="small" style="margin-bottom:6px"><b>Bugün ne kadar vaktin var?</b></div>
-    <div class="row" style="margin-bottom:12px">${AVAIL.map(([n,l])=>`<button class="chip" data-avail="${n}" aria-pressed="${p===n}">${l}</button>`).join("")}</div>
+    ${noAvail ? "" : `<div class="small" style="margin-bottom:6px"><b>Bugün ne kadar vaktin var?</b></div>
+    <div class="row" style="margin-bottom:12px">${AVAIL.map(([n,l])=>`<button class="chip" data-avail="${n}" aria-pressed="${p===n}">${l}</button>`).join("")}</div>`}
     <div class="between"><h3 style="margin:0">${rest&&!avail?`🛡️ Jüri / sınav modu · ${restEnd}'e kadar`:`⏱️ Bugünkü hedef: ${p>=60?(p/60).toString().replace(".",",")+" saat":p+" dk"}`}</h3><span class="tag ${today_m>=p?"ok":"acc"}">${today_m} dk</span></div>
     <div class="bar" style="margin:10px 0 8px"><i style="width:${Math.min(100, Math.round(100*today_m/p))}%"></i></div>
     <ul class="small" style="margin:0 0 8px;padding-left:20px">${items.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>
@@ -1860,7 +1875,8 @@ function readLinks(r){ if(!bookReads().length) return []; const out = [];
 function syncGram(){ const g = game(); LESSONS.forEach((L,i)=>{ const d = gr().done[L.id], k = "g"+(i+1); if(d && d.pass && !g.done[k]) g.done[k] = {d: today(), xp: 30, l: "Dilbilgisi Ünite "+(i+1), auto: 1}; }); }
 function gameClick(e, redraw){
   const t = e.target.closest("[data-gtick]"); if(t){ e.preventDefault(); const g = game(), k = t.dataset.gtick;
-    if(g.done[k]) delete g.done[k]; else { g.done[k] = {d: today(), xp: +t.dataset.xp, l: t.dataset.l}; toast(`+${t.dataset.xp} XP ✨`); }
+    if(g.done[k]) delete g.done[k]; else { g.done[k] = {d: today(), xp: +t.dataset.xp, l: t.dataset.l}; toast(`+${t.dataset.xp} XP ✨`);
+      lvCheck(); save(); if(todaySteps().some(s=>s.k==="book") && flowNext($("#main"), "book")) return true; }
     lvCheck(); save(); redraw(); return true; }
   return false;
 }
@@ -2034,7 +2050,19 @@ function render(){
   if(!S.onboarded && !inTest){ m.innerHTML = vWelcome(); bindWelcome(); return; }
   const V = {bugun:vToday, kelime:vCards, gramer:vGram, cumle:(m,s)=>vLadder(m,s), pratik:vPractice, rehber:vGuide, oyun:vGame, kaynak:vRes, ben:vMe, test:vTest, sonuc:vResult}[r.page] || vToday;
   V(m, r.sub, r.arg); window.scrollTo(0,0);
+  // "What's next" bar on every page: one tap back onto today's path
+  const old = document.getElementById("nextbar"); if(old) old.remove();
+  document.body.classList.remove("hasnext");
+  if(S.onboarded && !inTest && r.page!=="bugun"){
+    const st = todaySteps(), i = st.findIndex(s=>!s.done);
+    if(i>=0){ const nx = st[i], here = location.hash===nx.href || (nx.k==="gram" && location.hash.startsWith(nx.href)) || (nx.k==="cards" && location.hash.startsWith("#kelime"));
+      $("#tabbar").insertAdjacentHTML("afterbegin", here
+        ? `<div class="nextbar here" id="nextbar"><span>📍</span><span style="flex:1">Şu an adım ${i+1}/${st.length}: ${nx.ic} ${nx.n}. Bitince seni sıradakine götüreceğim.</span><a href="#bugun" style="color:inherit;font-weight:600">Plan</a></div>`
+        : `<a class="nextbar" id="nextbar" href="${nx.href}" data-nextbar><span>▶</span><span style="flex:1">Sıradaki adım ${i+1}/${st.length}: ${nx.ic} ${nx.n}</span><span style="opacity:.85">${nx.min} dk ›</span></a>`);
+      document.body.classList.add("hasnext"); }
+  }
 }
+document.addEventListener("click", e=>{ if(e.target.closest("[data-nextbar]")) setFlow(true); });
 window.addEventListener("hashchange", render);
 
 /* ================= WELCOME ================= */
@@ -2228,29 +2256,33 @@ function vToday(m){
   const lastCoach = (S.coach||[]).slice(-1)[0], coachDue = (!lastCoach || lastCoach.date <= addDays(t,-7)) && weekStats().days>=3;
   m.innerHTML = `<div class="tiny">${new Date().toLocaleDateString("tr-TR",{weekday:"long",day:"numeric",month:"long"})}</div>
   <h1>${hello}</h1>
-  <p class="sub">${allDone ? "Bugünün dersini bitirdin. Harika iş! 🎉" : "Bugün ne yapacağını düşünme, sırayla git. Yaklaşık 18 dakika."}</p>
+  <p class="sub">${allDone ? "Bugünün dersini bitirdin. Harika iş! 🎉" : `Bugün ne yapacağını düşünme: aşağıdaki sırayla git, gerisini uygulama söyler. Yaklaşık ${steps.reduce((a,s)=>a+(s.done?0:s.min),0)} dakika.`}</p>
   ${miles.length ? `<div class="card" style="text-align:center"><div style="font-size:40px">${miles.map(x=>x[1]).join(" ")}</div><h3 style="margin:6px 0 2px">Yeni rozet${miles.length>1?"ler":""}: ${miles.map(x=>esc(x[2])).join(", ")}</h3><div class="small muted">${pick(PRAISE)}</div></div>` : ""}
   ${missed2 ? `<div class="card soft small">Tekrar hoş geldin 💜 Ara vermek öğrenmenin parçası. Bugün sadece ilk adımı yapsan bile kaldığın yerden devam etmiş olursun.</div>`:""}
-  ${moodCard()}
-  <div class="card"><div class="between"><h3 style="margin:0">📘 Bugünkü dersin</h3><span class="tag acc">${allDone?"bitti":`adım ${cur+1}/3`}</span></div>
+  ${(()=>{ const mo = MOODS.find(x=>x[0]===d.mood), av = AVAIL.find(x=>x[0]===d.avail);
+    const body = moodCard() + `<div class="card" style="margin-top:-6px"><div class="small" style="margin-bottom:6px"><b>Bugün ne kadar vaktin var?</b> <span class="tiny">Plan buna göre kısalır ya da uzar.</span></div><div class="row">${AVAIL.map(([n,l])=>`<button class="chip" data-avail="${n}" aria-pressed="${pace()===n}">${l}</button>`).join("")}</div></div>`;
+    return (mo || av) && !allDone ? `<details><summary class="small muted" style="margin:0 0 10px;cursor:pointer">${mo?mo[1]:"🙂"} · ${av?av[1]:pace()+" dk"} · <u>değiştir</u></summary>${body}</details>` : allDone ? "" : body; })()}
+  <div class="card" style="border:2px solid var(--accent)"><div class="between"><h3 style="margin:0">📘 Bugünkü planın</h3><span class="tag acc">${allDone?"bitti ✓":`adım ${cur+1}/${steps.length}`}</span></div>
    <div class="steps">${steps.map((s,i)=>`<a class="sr ${i===cur?"cur":""}" href="${s.href}" data-step="${i}" style="text-decoration:none;color:inherit"><span class="dot ${s.done?"on":""}">${s.done?ICON.check:i+1}</span>
      <span style="flex:1;min-width:0"><b>${s.ic} ${s.n}</b><span class="small muted" style="display:block">${esc(s.d)}</span></span><span class="tiny">${s.min} dk</span></a>`).join("")}</div>
-   ${allDone ? `<div class="small muted" style="margin-top:8px">Yarın: ${esc((nextLesson()||{}).t || "tekrar günü")}. İstersen aşağıdaki bonus görevi yap.</div>`
-     : `<button class="btn primary block" data-flow style="margin-top:10px">${cur===0 && !steps.some(s=>s.done) ? "Başla" : "Devam et"} → ${steps[cur].n}</button>
-        <p class="tiny" style="text-align:center;margin:6px 0 0">${tiny ? "Bugün yoğunsun: sadece 2 dk kart da yeter, ders yarına kalabilir." : "Bir adım bitince uygulama seni kendiliğinden sıradakine geçirir."}</p>`}</div>
-  ${gameCard()}
-  ${paceCard(true)}
+   ${allDone ? `<div class="card soft" style="margin:10px 0 0"><b>✓ Bugünlük bu kadar.</b> Artık dinlenebilirsin; yarın burası seni yine sırayla götürecek. <span class="small muted">Yarın: ${esc((nextLesson()||{}).t || "tekrar günü")}.</span>
+        <div class="row" style="margin-top:8px">${(game().dice||{})[today()] ? "" : `<button class="btn sm" data-dice>🎲 İstersen zar at (keyifli kapanış)</button>`}</div></div>`
+     : `<button class="btn primary block" data-flow style="margin-top:10px">${cur===0 && !steps.some(s=>s.done) ? "Başla" : "Devam et"} → ${steps[cur].ic} ${steps[cur].n}</button>
+        <p class="tiny" style="text-align:center;margin:6px 0 0">${tiny ? "Bugün yoğunsun: sadece kartlar da yeter, ders yarına kalabilir." : "Başka bir sayfaya gitmene gerek yok: her adım bitince uygulama seni kendiliğinden sıradakine götürür. Kaybolursan alttaki mor ▶ çubuğa dokun."}</p>
+        ${steps[cur].k==="book" ? `<p class="tiny" style="text-align:center;margin:4px 0 0"><a href="#" data-skipbook style="color:inherit">Bugün kitaba vaktim yok, atla</a></p>` : ""}`}</div>
   ${coachDue ? `<a class="card between" href="#rehber" style="text-decoration:none;color:inherit"><div><h3 style="margin:0">🧑‍🏫 Haftalık değerlendirme zamanı</h3><div class="small muted">Rehber'de raporunu Claude'a gönder, detaylı geri bildirim ve gelecek haftanın planını al.</div></div>›</a>` : ""}
-  <div class="card"><div class="between" style="margin-bottom:10px"><h3 style="margin:0">Bu hafta</h3><span class="tag acc">${count}/6 gün</span></div><div class="week">${week}</div></div>
-  ${tiny ? "" : `<div class="card task"><button class="tick ${d.main?"on":""}" data-tick="main" aria-label="Bonus görevi tamamlandı işaretle">${ICON.check}</button>
+  <details class="card"><summary><b>📊 İlerlemen, oyun ve hedef tarihler</b></summary><div style="margin-top:10px">${gameCard()}${paceCard(true, true)}
+   <div class="card"><div class="between" style="margin-bottom:10px"><h3 style="margin:0">Bu hafta</h3><span class="tag acc">${count}/6 gün</span></div><div class="week">${week}</div></div></div></details>
+  ${tiny ? "" : `<details class="card"><summary><b>➕ Daha fazlası</b> <span class="tiny">isteğe bağlı bonus görev</span></summary><div class="card task" style="margin-top:10px"><button class="tick ${d.main?"on":""}" data-tick="main" aria-label="Bonus görevi tamamlandı işaretle">${ICON.check}</button>
     <div class="body"><div class="between"><h3>${task.icon} Bonus: ${esc(task.title)}</h3><span class="tiny">${task.min} dk · isteğe bağlı</span></div>
     <ol class="small">${task.steps.map(s=>`<li>${s}</li>`).join("")}</ol>
-    <div class="row">${task.actions}</div></div></div>`}
+    <div class="row">${task.actions}</div></div></div></details>`}
   <p class="tiny" style="text-align:center;margin-top:18px"><a href="#rehber/ayar" style="color:inherit">☁️ <span data-sync-text>${esc(Sync.text())}</span></a></p>`;
   m.onclick = e=>{
     if(paceClick(e, ()=>vToday(m))) return;
     if(gameClick(e, ()=>vToday(m))) return;
     if(e.target.closest("[data-dice]")){ rollDice(); location.hash = "#oyun"; return; }
+    if(e.target.closest("[data-skipbook]")){ e.preventDefault(); fd().book = true; save(); vToday(m); return; }
     if(e.target.closest("[data-flow]") || e.target.closest("[data-step]")){ e.preventDefault(); const i = e.target.closest("[data-step]") ? +e.target.closest("[data-step]").dataset.step : cur; setFlow(true); location.hash = steps[i].href; return; }
     const tk = e.target.closest("[data-tick]");
     if(tk){ S.done[t] = Object.assign({}, S.done[t]); S.done[t].main = !S.done[t].main; save(); vToday(m); if(S.done[t].main) toast("Tamamlandı ✓"); return; }
@@ -2405,7 +2437,7 @@ function vCards(m, sub){
     if(r.dataset.r==="1"){ if(!CS.again.has(id)){ c.box = Math.min(5, c.box+1); } c.due = addDays(today(), INTERVALS[Math.max(1,c.box)]); CS.q.shift(); CS.ok++; }
     else { c.box = 0; c.due = today(); if(!CS.again.has(id)) c.l = (c.l||0)+1; CS.again.add(id); CS.q.push(CS.q.shift()); }
     S.cards[id] = c; CS.show = false; logAdd("cards");
-    if(!CS.q.length){ S.done[today()] = Object.assign({}, S.done[today()], {cards:true}); save(); if(flowNext(m, "cards")) return; toast("Kartlar tamam ✓"); }
+    if(!CS.q.length){ if(flowNext(m, "cards")) return; toast("Kartlar tamam ✓"); }
     save(); vCards(m);
   };
 }
