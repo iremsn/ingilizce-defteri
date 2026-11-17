@@ -121,6 +121,13 @@ textarea:focus,input.f:focus{outline:0;box-shadow:0 0 0 3px color-mix(in srgb,va
 .rec.live{animation:pulse 1.2s infinite}
 @keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 50%,transparent)}100%{box-shadow:0 0 0 18px transparent}}
 .entry{border-top:1px solid var(--line);padding:10px 0}
+.entry:first-child{border-top:0}
+summary{cursor:pointer}
+.slot{border:0;border-bottom:2px solid var(--accent);background:var(--accent-soft);color:var(--accent);border-radius:6px 6px 0 0;padding:2px 6px;margin:0 2px;font:inherit;font-weight:600;max-width:100%}
+.slot::placeholder{color:var(--ink-3);font-weight:400}
+.slot:focus{outline:0;background:var(--surface);box-shadow:0 0 0 2px var(--accent)}
+.grid2>.card h3{font-size:16px}
+@media (max-width:520px){.grid2:has(>.card){grid-template-columns:1fr}}
 .entry pre{white-space:pre-wrap;font:inherit;margin:6px 0 0;font-size:14.5px}
 /* resources */
 .res{display:flex;gap:12px;align-items:flex-start}
@@ -276,6 +283,140 @@ const W_PROMPTS = {
  mid:["Son tasarım projeni anlat: problem neydi, sen ne yaptın? (80–100 kelime)","Bir şirkete kısa bir e-posta yaz: kendini tanıt ve staj fırsatı sor","Gittiğin ya da gitmek istediğin bir şehri anlat (80 kelime)","Günlük hayatta kullandığın kötü tasarlanmış bir ürünü anlat. Nasıl düzeltirdin?","Bir dizi ya da film öner: neden izlenmeli?","Geçen yıl yaşadığın zor bir şeyi ve ondan ne öğrendiğini anlat","Hayalindeki stüdyo nasıl olurdu? (would kullan)"],
  high:["Portfolyon için bir proje açıklaması yaz (120–150 kelime)","\"Sürdürülebilir tasarım sadece malzeme seçimi değildir.\" Katılıyor musun? (150–200 kelime, IELTS Task 2 tarzı)","Bir staj başvurusu için ön yazı (cover letter) taslağı yaz","\"Form follows function\" bugün hâlâ geçerli mi? Fikrini savun","Bir müşteriye kibar ama net bir e-posta yaz: teslim tarihi bir hafta gecikecek","Yapay zekâ tasarımcıların işini nasıl değiştiriyor? Avantaj ve riskler","Online eğitim mi yüz yüze eğitim mi? Karşılaştır ve sonuca var"]
 };
+/* Writing workshop units. [[...]] marks the parts the learner swaps for their own words. */
+const UNITS = [
+ {id:"a1-1",lv:0,t:"Kendini tanıt",p:"Kendini tanıt: adın, yaşın, okulun, nerede yaşadığın, neleri sevdiğin.",rule:"I am (I'm) ... · I live in ... · I like ...",
+  model:"Hi! My name is [[Ece]]. I am [[twenty]] years old. I am a [[design]] student. I live in [[Ankara]]. I like [[coffee]] and [[music]].",
+  tr:"Merhaba! Adım Ece. Yirmi yaşındayım. Tasarım öğrencisiyim. Ankara'da yaşıyorum. Kahveyi ve müziği severim.",
+  frames:["My name is ___.","I am ___ years old.","I am a ___ student.","I live in ___.","I like ___ and ___.","I don't like ___."],
+  bank:["design","architecture","Istanbul","İzmir","tea","coffee","music","drawing","films","sport","books"]},
+ {id:"a1-2",lv:0,t:"Günlük rutinim",p:"Sıradan bir gününü anlat: kaçta kalkarsın, okula nasıl gidersin, akşam ne yaparsın?",rule:"I + fiil (I work) · he/she + fiil-s (she works)",
+  model:"I get up at [[seven]]. I have [[tea]] for breakfast. I go to school by [[bus]]. I have classes in the [[morning]]. In the evening, I [[draw]] and watch [[series]].",
+  tr:"Yedide kalkarım. Kahvaltıda çay içerim. Okula otobüsle giderim. Sabahları derslerim var. Akşamları çizim yapar, dizi izlerim.",
+  frames:["I get up at ___.","I have ___ for breakfast.","I go to ___ by ___.","In the evening, I ___.","I usually ___."],
+  bank:["eight","bus","metro","on foot","coffee","eggs","afternoon","study","cook","read","series"]},
+ {id:"a1-3",lv:0,t:"Odam ve masam",p:"Odanı ya da çalışma masanı anlat: neler var, neler yok, en sevdiğin şey ne?",rule:"There is a + tekil · There are + çoğul",
+  model:"In my room, there is a [[big desk]]. There are [[two lamps]]. There is a [[green plant]] next to the window. There aren't any [[posters]]. My favourite thing is my [[chair]].",
+  tr:"Odamda büyük bir masa var. İki lamba var. Pencerenin yanında yeşil bir bitki var. Hiç poster yok. En sevdiğim şey sandalyem.",
+  frames:["In my room, there is a ___.","There are ___ ___s.","There isn't a ___.","There aren't any ___.","My favourite thing is my ___."],
+  bank:["bed","shelf","laptop","books","pencils","window","mirror","carpet","small","white","old"]},
+ {id:"a1-4",lv:0,t:"Sevdiğim nesne",p:"En sevdiğin nesneyi anlat: neye benziyor, neden yapılmış, neden seviyorsun?",rule:"Sıfat isimden önce: a small camera (camera small değil)",
+  model:"My favourite object is my [[old camera]]. It is [[black]] and [[small]]. It is made of [[metal]]. I use it [[every weekend]]. I love it because it is [[simple]].",
+  tr:"En sevdiğim nesne eski fotoğraf makinem. Siyah ve küçük. Metalden yapılmış. Her hafta sonu kullanırım. Onu seviyorum çünkü sade.",
+  frames:["My favourite object is my ___.","It is ___ and ___.","It is made of ___.","I use it ___.","I love it because it is ___."],
+  bank:["mug","bag","lamp","pen","wood","plastic","glass","light","heavy","beautiful","useful","every day"]},
+ {id:"a1-5",lv:0,t:"Bir arkadaşım",p:"Bir arkadaşını ya da aile üyeni anlat.",rule:"He/She + fiil-s (he lives) · doesn't + yalın fiil (he doesn't like)",
+  model:"This is my friend [[Mert]]. He is [[21]]. He studies [[architecture]]. He lives in [[İzmir]]. He likes [[football]], but he doesn't like [[coffee]].",
+  tr:"Bu arkadaşım Mert. 21 yaşında. Mimarlık okuyor. İzmir'de yaşıyor. Futbolu seviyor ama kahveyi sevmiyor.",
+  frames:["This is my ___.","He/She is ___.","He/She studies ___.","He/She lives in ___.","He/She likes ___, but he/she doesn't like ___."],
+  bank:["sister","brother","mother","best friend","works","plays","music","cats","early mornings","engineering"]},
+ {id:"a1-6",lv:0,t:"Kafede sipariş",p:"Bir kafede sipariş verdiğin kısa bir konuşma yaz.",rule:"Can I have ..., please? · I'd like ... · How much is it?",
+  model:"Hello! Can I have a [[latte]], please? A [[small]] one. And a [[cheese sandwich]]. How much is it? Thank you!",
+  tr:"Merhaba! Bir latte alabilir miyim lütfen? Küçük boy. Bir de peynirli sandviç. Ne kadar? Teşekkürler!",
+  frames:["Can I have a ___, please?","I'd like a ___.","A ___ one, please.","How much is ___?","Thank you!"],
+  bank:["tea","water","cappuccino","large","medium","cake","croissant","to take away","here"]},
+ {id:"a1-7",lv:0,t:"Hafta sonum",p:"Hafta sonları ne yaparsın? Neler yapabilirsin, neler yapamazsın?",rule:"can / can't + yalın fiil (I can swim)",
+  model:"On Saturdays, I [[sleep late]]. I [[meet my friends]] in a café. On Sundays, I [[clean my room]] and [[study]]. I can't [[cook]], but I can [[make good coffee]]!",
+  tr:"Cumartesileri geç uyurum. Arkadaşlarımla bir kafede buluşurum. Pazarları odamı toplar ve ders çalışırım. Yemek yapamam ama iyi kahve yapabilirim!",
+  frames:["On Saturdays, I ___.","On Sundays, I ___.","I can ___.","I can't ___, but I can ___."],
+  bank:["go to the cinema","visit my family","draw","swim","dance","play the guitar","walk","rest"]},
+ {id:"a2-1",lv:1,t:"Dün ne yaptım?",p:"Dününü anlat. Sabahtan akşama 5 cümle.",rule:"Geçmiş zaman: work → worked · go → went · make → made",
+  model:"Yesterday, I [[woke up]] late. I [[went]] to the studio and [[made]] three sketches. At lunch, I [[ate]] with Selin. In the evening, I [[watched]] a film. It was a [[good]] day.",
+  tr:"Dün geç uyandım. Stüdyoya gittim ve üç eskiz yaptım. Öğle yemeğini Selin'le yedim. Akşam bir film izledim. İyi bir gündü.",
+  frames:["Yesterday, I ___.","Then, I ___.","At lunch, I ___.","In the evening, I ___.","It was a ___ day."],
+  bank:["got up","had","saw","met","bought","studied","cooked","tired","busy","nice","boring"]},
+ {id:"a2-2",lv:1,t:"Bir seyahat",p:"Gittiğin bir yeri anlat: nereye, kiminle, ne yaptınız, en güzeli neydi?",rule:"Geçmiş zaman + was/were (It was hot. We were happy.)",
+  model:"Last summer, I went to [[Antalya]] with my [[family]]. We stayed in a [[small hotel]] near the sea. The weather was [[hot]]. We [[swam]] every day. The best part was [[the old town]].",
+  tr:"Geçen yaz ailemle Antalya'ya gittim. Denize yakın küçük bir otelde kaldık. Hava sıcaktı. Her gün yüzdük. En güzel kısmı eski şehirdi.",
+  frames:["Last ___, I went to ___ with ___.","We stayed in ___.","The weather was ___.","Every day, we ___.","The best part was ___."],
+  bank:["winter","friends","Kapadokya","Rome","a hostel","a tent","cold","sunny","walked","took photos","the food"]},
+ {id:"a2-3",lv:1,t:"Hafta sonu planım",p:"Bu hafta sonu ne yapmayı planlıyorsun?",rule:"be + going to + fiil (I'm going to visit ...)",
+  model:"This weekend, I'm going to [[visit my grandmother]]. On Saturday, I'm going to [[finish my model]]. I'm not going to [[work]]. On Sunday, I'm going to [[relax]] and [[read a book]].",
+  tr:"Bu hafta sonu büyükannemi ziyaret edeceğim. Cumartesi maketimi bitireceğim. Çalışmayacağım. Pazar günü dinlenip kitap okuyacağım.",
+  frames:["This weekend, I'm going to ___.","On Saturday, I'm going to ___.","I'm not going to ___.","On Sunday, I'm going to ___."],
+  bank:["go shopping","clean the house","see a film","sleep a lot","study for an exam","meet Selin","cook"]},
+ {id:"a2-4",lv:1,t:"İki ürünü karşılaştır",p:"İki ürünü karşılaştır (iki sandalye, iki telefon, iki çanta…). Hangisi daha iyi?",rule:"Kısa sıfat + -er (cheaper) · uzun sıfat: more ... (more comfortable) · than",
+  model:"I have two chairs: a [[wooden]] one and a [[plastic]] one. The wooden chair is [[heavier]], but it is [[more comfortable]]. The plastic one is [[cheaper]] and [[lighter]]. I think the [[wooden]] chair is better.",
+  tr:"İki sandalyem var: ahşap ve plastik. Ahşap sandalye daha ağır ama daha rahat. Plastik olan daha ucuz ve daha hafif. Bence ahşap sandalye daha iyi.",
+  frames:["I have two ___: ___ and ___.","The ___ is ___er than the ___.","The ___ is more ___ than the ___.","I think the ___ is better because ___."],
+  bank:["phones","bags","metal","bigger","smaller","stronger","more expensive","more beautiful","easier to use"]},
+ {id:"a2-5",lv:1,t:"Kısa mesaj",p:"Bir arkadaşına bir buluşmaya gelemeyeceğini yazan kısa bir mesaj yaz.",rule:"I'm sorry, I can't ... because ... · Can we ... instead?",
+  model:"Hi [[Ayşe]], How are you? I'm sorry, I can't come to [[the meeting]] on [[Friday]] because [[I have an exam]]. Can we meet on [[Monday]] instead? See you soon, [[Deniz]]",
+  tr:"Selam Ayşe, nasılsın? Üzgünüm, cuma günkü toplantıya gelemiyorum çünkü sınavım var. Onun yerine pazartesi buluşabilir miyiz? Görüşürüz, Deniz",
+  frames:["Hi ___,","I'm sorry, I can't ___ because ___.","Can we ___ instead?","Thanks for ___.","See you soon,"],
+  bank:["the party","dinner","the cinema","I'm ill","I have to work","tomorrow","next week","Saturday"]},
+ {id:"a2-6",lv:1,t:"Şu an ne yapıyorum?",p:"Şu an neredesin, ne yapıyorsun? Genelde ne yaparsın, bugün farklı olan ne?",rule:"Şimdi: I'm working · Genelde: I work",
+  model:"Right now, I'm [[sitting]] in the [[library]]. I'm working on a [[lamp]] project. I usually work [[at home]], but today my brother is [[playing music]] very loudly!",
+  tr:"Şu an kütüphanede oturuyorum. Bir lamba projesi üzerinde çalışıyorum. Genelde evde çalışırım ama bugün kardeşim çok yüksek sesle müzik çalıyor!",
+  frames:["Right now, I'm ___.","I'm working on ___.","I usually ___, but today ___."],
+  bank:["café","studio","bus","writing","reading","drinking tea","in my room","my friends are"]},
+ {id:"a2-7",lv:1,t:"Nasıl yapılır?",p:"Bildiğin bir şeyin nasıl yapıldığını adım adım anlat (maket, kahve, yemek…).",rule:"Emir cümlesi (Cut the paper.) + First, Then, Next, Finally",
+  model:"How to make a paper model: First, [[draw]] the shape on paper. Then, [[cut]] it carefully. Next, [[fold]] the lines. Finally, [[glue]] the parts together. Easy!",
+  tr:"Kâğıt maket nasıl yapılır: Önce şekli kâğıda çiz. Sonra dikkatlice kes. Ardından çizgileri katla. Son olarak parçaları yapıştır. Kolay!",
+  frames:["How to ___:","First, ___.","Then, ___.","Next, ___.","Finally, ___."],
+  bank:["boil","pour","mix","add","wait","measure","sand","paint"]},
+ {id:"b1-1",lv:2,t:"Projemi anlatıyorum",p:"Yaptığın bir tasarım projesini anlat: problem, ne yaptın, nasıl test ettin, ne öğrendin?",rule:"The problem was that ... · So I ... · If I had more time, I would ...",
+  model:"Last term, I designed a [[desk lamp]] for [[students]]. The problem was that most lamps [[are too bright]]. So I [[made the light adjustable]]. I tested it with [[five friends]], and they [[liked the soft light]]. If I had more time, I would [[use a better material]].",
+  frames:["Last term, I designed ___ for ___.","The problem was that ___.","So I decided to ___.","I tested it with ___, and ___.","If I had more time, I would ___."],
+  bank:["a chair","packaging","elderly people","uncomfortable","too expensive","users","feedback","improve the handle"]},
+ {id:"b1-2",lv:2,t:"Deneyimlerim",p:"Hayatında yaptığın ve hiç yapmadığın ama yapmak istediğin şeyleri anlat.",rule:"Deneyim: I have visited / I have never been · Belli zaman: I went (in 2022)",
+  model:"I have visited [[three countries]] so far. I have never been to [[Japan]], but I'd love to go. I have [[studied English on and off]] for years. Recently, I have [[started a new routine]], and I feel [[more confident]].",
+  frames:["I have ___ so far.","I have never ___, but I'd love to ___.","I have ___ for ___ years.","Recently, I have ___.","Last year, I ___."],
+  bank:["tried","met","learned","won","lived abroad","made a website","for a long time","since 2023"]},
+ {id:"b1-3",lv:2,t:"Fikrimi söylüyorum",p:"Öğrenciler okurken yarı zamanlı çalışmalı mı? Fikrini yaz.",rule:"In my opinion ... · Firstly, Secondly, However, Overall",
+  model:"In my opinion, [[students should work part-time]]. Firstly, [[they gain real experience]]. Secondly, [[they learn to manage money]]. However, [[it can affect their grades]]. Overall, I think [[it is a good idea if the hours are short]].",
+  frames:["In my opinion, ___.","Firstly, ___.","Secondly, ___.","However, ___.","Overall, I think ___."],
+  bank:["it is a waste of time","they meet new people","they feel tired","they become independent","on the other hand"]},
+ {id:"b1-4",lv:2,t:"Kötü tasarlanmış bir ürün",p:"Her gün kullandığın ama kötü tasarlanmış bir ürünü anlat. Nasıl düzeltirdin?",rule:"..., so ... (sonuç) · If I redesigned it, I would ...",
+  model:"I use a [[kettle]] every day, but its design is frustrating. The [[handle gets hot]], so [[I can't hold it easily]]. Also, [[the lid is hard to open]]. If I redesigned it, I would [[add a cool-touch handle]] and [[a button for the lid]].",
+  frames:["I use a ___ every day, but ___.","The ___, so ___.","Also, ___.","If I redesigned it, I would ___."],
+  bank:["remote control","door handle","the buttons are too small","it breaks easily","make it lighter","use clearer icons"]},
+ {id:"b1-5",lv:2,t:"Staj e-postası",p:"Bir tasarım stüdyosuna staj imkânı soran resmi bir e-posta yaz.",rule:"Resmi e-posta: Dear ..., I am writing to ..., I look forward to hearing from you.",
+  model:"Dear [[Ms Smith]], My name is [[Deniz Kaya]], and I am a [[third-year]] industrial design student at [[Ankara University]]. I am writing to ask whether you offer [[summer internships]]. I am particularly interested in [[furniture design]]. I have attached my CV and portfolio. I look forward to hearing from you. Best regards, [[Deniz Kaya]]",
+  frames:["Dear ___,","My name is ___, and I am ___.","I am writing to ask whether ___.","I am particularly interested in ___.","I have attached ___.","I look forward to hearing from you."],
+  bank:["second-year","part-time positions","product design","packaging","lighting","my portfolio","Kind regards"]},
+ {id:"b1-6",lv:2,t:"Hayalimdeki hayat",p:"İstediğin her yerde yaşayabilseydin nerede, nasıl yaşardın?",rule:"If I could ..., I would ... (hayali durum)",
+  model:"If I could live anywhere, I would live in [[Copenhagen]]. I would [[cycle to work]] every day. I would work in [[a small design studio]]. The only problem is that [[it would be very expensive]].",
+  frames:["If I could ___, I would ___.","I would ___ every day.","I would work in ___.","The only problem is that ___."],
+  bank:["Milan","Tokyo","by the sea","in a big company","freelance","I would miss my family","the weather"]},
+ {id:"b2-1",lv:3,t:"Portfolyo proje metni",p:"Portfolyon için bir proje açıklaması yaz (100–150 kelime).",rule:"X is a ... designed for ... · Research showed that ... · ..., which ...",
+  model:"[[Lumo]] is a [[modular desk lamp]] designed for [[small student rooms]]. Research showed that [[most students study late at night with poor lighting]]. Through [[user interviews and quick prototypes]], I developed [[a lamp that clips onto shelves and adjusts to three positions]]. The final design uses [[recycled aluminium]], which makes it [[light and durable]].",
+  frames:["___ is a ___ designed for ___.","Research showed that ___.","Through ___, I developed ___.","The final design uses ___, which makes it ___."],
+  bank:["observations","a survey","iterations","ergonomic","affordable","easy to assemble","injection-moulded","sustainable"]},
+ {id:"b2-2",lv:3,t:"Tartışma yazısı (IELTS Task 2)",p:"\"Tasarımda estetik mi işlev mi daha önemli?\" İki tarafı da tartış ve fikrini söyle.",rule:"Some people believe ..., while others argue ... · On the one hand / On the other hand · In my view",
+  model:"Some people believe that [[design should prioritise aesthetics]], while others argue that [[function matters more]]. On the one hand, [[attractive products create emotional attachment]]. On the other hand, [[a beautiful product that is hard to use quickly frustrates people]]. In my view, [[the best designs balance both]], because [[people judge objects with their eyes and their hands]].",
+  frames:["Some people believe that ___, while others argue that ___.","On the one hand, ___.","On the other hand, ___.","In my view, ___, because ___."],
+  bank:["this is particularly true for","for instance","as a result","nevertheless","to sum up"]},
+ {id:"b2-3",lv:3,t:"Müşteriye gecikme e-postası",p:"Müşteriye işin bir hafta gecikeceğini kibar ama net bir dille bildir.",rule:"I'm writing to let you know that ... · Unfortunately ... · We apologise for any inconvenience.",
+  model:"Dear [[Mr Lee]], I'm writing to let you know that [[the prototype]] will be delayed by [[one week]]. Unfortunately, [[our supplier has not delivered the materials on time]]. We apologise for any inconvenience. In the meantime, [[we will send you updated renders]]. Please let me know if [[this affects your schedule]].",
+  frames:["I'm writing to let you know that ___.","Unfortunately, ___.","We apologise for any inconvenience.","In the meantime, ___.","Please let me know if ___."],
+  bank:["the final samples","two days","the factory","a technical issue","a progress report","you have any questions"]},
+ {id:"b2-4",lv:3,t:"Ön yazı (cover letter)",p:"Bir pozisyon için ön yazının ana paragrafını yaz.",rule:"I am applying for ... · ..., which taught me ... · I am particularly drawn to ...",
+  model:"I am applying for the [[Junior Designer]] position at [[Studio North]]. During my internship at [[a packaging agency]], I [[worked on packaging for a local food brand]], which taught me [[how to balance client needs with production limits]]. I am particularly drawn to your studio because of [[your focus on sustainable materials]].",
+  frames:["I am applying for the ___ position at ___.","During ___, I ___, which taught me ___.","I am particularly drawn to your studio because ___."],
+  bank:["internship","furniture","user research","3D modelling","deadlines","teamwork","attention to detail"]},
+ {id:"b2-5",lv:3,t:"Grafik özeti (IELTS Task 1)",p:"Bir şehirde bisikletle işe gidenlerin 10 yılda iki katına çıktığını gösteren bir grafiği özetle.",rule:"The chart shows ... · Overall, ... · whereas · had doubled",
+  model:"The chart shows [[the number of people cycling to work in a city]] between [[2015 and 2025]]. Overall, [[cycling increased significantly]]. In [[2015]], around [[5,000]] people cycled, whereas by [[2025]] this figure had [[doubled]]. The sharpest rise occurred [[after new bike lanes were built in 2020]].",
+  frames:["The chart shows ___ between ___ and ___.","Overall, ___.","In ___, ___, whereas by ___ ___.","The sharpest rise occurred ___."],
+  bank:["fell slightly","remained stable","rose steadily","peaked at","a gradual decline","approximately"]},
+ {id:"c1-1",lv:4,t:"Eleştirel deneme",p:"\"Form follows function\" bugün hâlâ geçerli mi? Temkinli (hedging) bir dille tartış.",rule:"Hedging: It could be argued that ... · arguably · might · While ..., ...",
+  model:"It could be argued that [[form follows function]] remains a useful principle. However, [[this view arguably oversimplifies how people relate to objects]]. While [[functional clarity is essential]], it is [[the emotional and cultural meaning]] that often determines [[whether a product is kept or discarded]]. Consequently, [[designers might do better to treat function as a starting point rather than a rule]].",
+  frames:["It could be argued that ___.","However, this view arguably ___.","While ___, it is ___ that ___.","Consequently, ___ might do better to ___."],
+  bank:["to some extent","it is worth noting that","this is not to say that","by contrast","in this respect"]},
+ {id:"c1-2",lv:4,t:"Proje yansıması",p:"Bitirdiğin bir projeye geri dönüp bak: ne işe yaradı, neyi farklı yapardın?",rule:"Had I ..., I would have ... · What surprised me most was ...",
+  model:"Looking back, [[the most valuable stage of the project was user testing]]. Had I [[involved users earlier]], I would have [[avoided two weeks of redesign]]. What surprised me most was [[how differently people held the product]]. Next time, I intend to [[prototype rougher and sooner]].",
+  frames:["Looking back, ___.","Had I ___, I would have ___.","What surprised me most was ___.","Next time, I intend to ___."],
+  bank:["in hindsight","the turning point","I underestimated","I would prioritise","it became clear that"]},
+ {id:"c1-3",lv:4,t:"Resmi öneri",p:"Kampüste bir şeyi iyileştirmek için kısa, resmi bir öneri metni yaz.",rule:"This proposal outlines ... · Not only would this ..., but it would also ...",
+  model:"This proposal outlines [[a redesign of the campus recycling bins]]. Currently, [[bins are poorly labelled, which leads to contamination]]. We propose [[colour-coded openings shaped to each type of waste]]. Not only would this [[reduce contamination]], but it would also [[raise awareness at little cost]].",
+  frames:["This proposal outlines ___.","Currently, ___, which leads to ___.","We propose ___.","Not only would this ___, but it would also ___."],
+  bank:["a pilot scheme","the estimated cost","stakeholders","in the long term","feasible","implementation"]}
+];
+const STAGES = [null,
+ {n:"Tamamla", d:"Örnek metindeki boşlukları kendi bilgilerinle doldur. Boş sayfa yok."},
+ {n:"Değiştir", d:"Örnek metni kendine göre değiştir, sonuna 1 cümle ekle."},
+ {n:"Kalıpla yaz", d:"Hazır kalıplar ve kelime kutusuyla kendi 3–5 cümleni yaz."},
+ {n:"Serbest", d:"Sadece konu var. Takılırsan ipucu butonu kalıpları açar."}];
 const S_TOPICS = {
  low:["Kendini tanıt","Bugün ne yaptın?","Ailen ve evin","Sevdiğin bir yemek","Telefonundaki en sevdiğin uygulama","Okuldaki bir günün","Hafta sonu ne yaparsın?"],
  mid:["Son projeni bir arkadaşına anlat","Unutamadığın bir seyahat","Kötü tasarlanmış bir ürün","5 yıl sonra nerede olmak istersin?","En sevdiğin tasarımcı ya da marka","Bir film ya da diziyi anlat","Staj mülakatı: 'Tell me about yourself'"],
@@ -545,7 +686,7 @@ const TABS = [
  ["kaynak","Kaynaklar",'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 21V5M8 7h7"/></svg>'],
  ["ben","Seviyem",'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20V14M10 20V9M16 20V4M22 20H2"/></svg>']
 ];
-function route(){ const h = (location.hash||"#bugun").slice(1).split("/"); return {page:h[0]||"bugun", sub:h[1]||""}; }
+function route(){ const h = (location.hash||"#bugun").slice(1).split("/"); return {page:h[0]||"bugun", sub:h[1]||"", arg:h[2]||""}; }
 function render(){
   if("speechSynthesis" in window) speechSynthesis.cancel();
   stopRec();
@@ -556,7 +697,7 @@ function render(){
   const m = $("#main"); m.onclick = null;
   if(!S.onboarded && !inTest){ m.innerHTML = vWelcome(); bindWelcome(); return; }
   const V = {bugun:vToday, kelime:vCards, pratik:vPractice, kaynak:vRes, ben:vMe, test:vTest, sonuc:vResult}[r.page] || vToday;
-  V(m, r.sub); window.scrollTo(0,0);
+  V(m, r.sub, r.arg); window.scrollTo(0,0);
 }
 window.addEventListener("hashchange", render);
 
@@ -699,6 +840,12 @@ function mainTask(dow){
     return {kind, icon:"🎧", title:"Dinleme", min:12, tag:LV[w], steps:st, actions:link};
   }
   if(kind==="writing"){
+    const u = nextUnit(), st = curStage();
+    return {kind, icon:"✍️", title:"Yazma: "+u.t, min:12, tag:LV[u.lv],
+      steps:["Örnek metni oku ve dinle (2 dk). Boş sayfayla başlamıyorsun.", STAGES[st].d+" <span class=\"tag\">"+STAGES[st].n+"</span>", "Kısa kontrol listesine bir göz at ve bitir.", "İstersen Claude'a göster: sadece en önemli 3 hatayı ipucuyla gösterir, sen düzeltirsin."],
+      actions:`<a class="btn" href="#pratik/yaz/${u.id}">Yazmaya başla</a><a class="btn ghost" href="#pratik/yaz">Enerjim yok: 1 cümle</a>`};
+  }
+  if(kind==="writingOld"){
     const w = workOf("writing");
     return {kind, icon:"✍️", title:"Yazma", min:15, tag:LV[w],
       steps:["Bugünün konusu: <b>"+esc(pick(W_PROMPTS[band(w)]))+"</b>","Çeviri yapmadan, doğrudan İngilizce yaz. Basit cümleler tamamen yeterli.","Bitince Claude'a düzelttir: metni baştan yazmayacak, hatalarını ve bir kuralı gösterecek.","Haftanın kuralını bir dahaki yazında bilerek kullan."],
@@ -736,7 +883,7 @@ function vToday(m){
   // week dots Monday..Sunday
   const now = new Date(t+"T12:00:00"); const mon = addDays(t, -((now.getDay()+6)%7));
   let week = "", count = 0;
-  for(let i=0;i<7;i++){ const day = addDays(mon,i); const dd = S.done[day]||{}; const any = dd.cards||dd.main; if(any) count++;
+  for(let i=0;i<7;i++){ const day = addDays(mon,i); const dd = S.done[day]||{}; const any = dd.cards||dd.main||dd.write; if(any) count++;
     week += `<div>${DOW[(i+1)%7]}<span class="${any?"done":""} ${day===t?"today":""}">${any?ICON.check:new Date(day+"T12:00:00").getDate()}</span></div>`; }
   const missed2 = !(S.done[addDays(t,-1)]||{}).main && !(S.done[addDays(t,-1)]||{}).cards && !(S.done[addDays(t,-2)]||{}).main && !(S.done[addDays(t,-2)]||{}).cards && S.history.length && S.testDate && S.testDate < addDays(t,-1);
   const hello = new Date().getHours()<12 ? "Günaydın" : new Date().getHours()<18 ? "İyi günler" : "İyi akşamlar";
@@ -871,41 +1018,203 @@ function listen(onText, onEnd, continuous){
   r.onend = ()=>{ REC=null; onEnd(finalText.trim()); };
   r.start(); REC = r; return r;
 }
-function vPractice(m, sub){
+function vPractice(m, sub, arg){
   sub = sub || "yaz";
   const seg = `<div class="seg" role="tablist">${[["yaz","Yaz"],["konus","Konuş"],["dinle","Dinle"],["sohbet","Sohbet"]].map(([k,l])=>`<button role="tab" aria-selected="${k===sub}" data-sub="${k}">${l}</button>`).join("")}</div>`;
   m.innerHTML = `<h1>Pratik</h1>` + seg + `<div id="pbody"></div>`;
   m.querySelector(".seg").onclick = e=>{ const b=e.target.closest("[data-sub]"); if(b) location.hash = "#pratik/"+b.dataset.sub; };
   const body = $("#pbody");
-  ({yaz:pWrite, konus:pSpeak, dinle:pListen, sohbet:pChat}[sub] || pWrite)(body);
+  ({yaz:pWrite, konus:pSpeak, dinle:pListen, sohbet:pChat}[sub] || pWrite)(body, arg);
 }
-function pWrite(el){
-  const w = workOf("writing"), prompts = W_PROMPTS[band(w)];
-  let pi = dayNo() % prompts.length;
+/* ---------- Writing workshop ---------- */
+function wr(){ if(!S.wr) S.wr = {stage:0, done:{}, count:[0,0,0,0,0], rules:[], free:0, micro:0, sentences:0, dismissUp:0}; return S.wr; }
+function defaultStage(){ const l = lvOf("writing"); return l<=0 ? 1 : l===1 ? 2 : 3; }
+function curStage(){ return wr().stage || defaultStage(); }
+function countSentences(t){ return (t.match(/[^.!?\n]+[.!?]*/g)||[]).filter(s=>s.trim().split(/\s+/).length>=2).length; }
+function nextUnit(){
+  const w = workOf("writing"), d = wr().done;
+  for(let l=w; l<5; l++){ const u = UNITS.find(x=>x.lv===l && !d[x.id]); if(u) return u; }
+  const atLv = UNITS.filter(x=>x.lv===w);
+  return atLv.find(x=>(d[x.id]||0) < curStage()) || atLv[dayNo()%atLv.length];
+}
+function markWrite(){ S.done[today()] = Object.assign({}, S.done[today()], {write:true}, DAYPLAN[new Date().getDay()]==="writing" ? {main:true} : {}); }
+function insertAt(ta, text){
+  const s = ta.selectionStart ?? ta.value.length, e = ta.selectionEnd ?? ta.value.length;
+  const before = ta.value.slice(0,s), sep = before && !/\s$/.test(before) ? " " : "";
+  ta.value = before + sep + text + ta.value.slice(e);
+  const pos = (before+sep+text).length; const blank = text.indexOf("___");
+  ta.focus(); if(blank>=0){ ta.setSelectionRange(before.length+sep.length+blank, before.length+sep.length+blank+3); } else ta.setSelectionRange(pos,pos);
+  ta.dispatchEvent(new Event("input"));
+}
+const wfocus = (u, stage, lv, text)=>`Ben Türkçe konuşan, İngilizceye karşı eski bir çekincesi olan bir öğrenciyim. Seviyem yaklaşık ${lv}. Aşağıdaki kısa metni bir yazma alıştırmasında yazdım.
+Alıştırma: ${u.t}. Hedef kalıp: ${u.rule}
+${stage<=2 ? "Not: Bir örnek metni kendime göre değiştirerek yazdım; özellikle değiştirdiğim kısımlara odaklan.\n" : ""}
+Lütfen:
+1) Önce iyi yaptığım 1 somut şeyi söyle.
+2) Hedef kalıbı doğru kullanmış mıyım? Kısaca söyle.
+3) En önemli en fazla 3 hatayı seç. Doğrusunu hemen verme: hatalı kısmı tırnak içinde göster ve Türkçe bir ipucu ver, ben kendim düzelteyim.
+4) Diğer küçük hataları sayma; onlara sonra geleceğiz.
+5) "BU HAFTANIN KURALI": tek cümlelik Türkçe bir kural.
+6) En sonda "CEVAPLAR" başlığı altında o 3 hatanın doğrusunu yaz.
+Parantez içinde Türkçe yazdığım kelimeler varsa İngilizcesini öner.
+
+Metin:
+${text}`;
+
+function pWrite(el, arg){
+  if(arg==="serbest") return wFree(el);
+  const u = arg && UNITS.find(x=>x.id===arg);
+  if(u) return wUnit(el, u);
+  wHome(el);
+}
+function wHome(el){
+  const W = wr(), st = curStage(), u = nextUnit();
+  const fr = u.frames[dayNo() % u.frames.length];
+  const showUp = st<4 && W.count[st]>=3 && W.dismissUp!==st;
+  const units = [0,1,2,3,4].map(l=>{
+    const list = UNITS.filter(x=>x.lv===l);
+    return `<details ${l===u.lv?"open":""} class="entry"><summary><b>${LV[l]}</b> <span class="muted small">· ${list.filter(x=>W.done[x.id]).length}/${list.length} bitti</span></summary>
+      <div style="margin-top:6px">${list.map(x=>`<a href="#pratik/yaz/${x.id}" class="between" style="padding:8px 0;text-decoration:none;color:inherit;border-top:1px solid var(--line)"><span>${esc(x.t)}</span><span class="tiny">${W.done[x.id] ? `<span class="tag ok">✓ ${STAGES[W.done[x.id]].n}</span>` : "›"}</span></a>`).join("")}</div></details>`; }).join("");
+  const writings = S.journal.filter(j=>j.kind==="yazma");
+  const first = writings[0], last = writings[writings.length-1];
+  el.innerHTML = `
+  <div class="card"><div class="between"><span class="tiny">Bugünkü yazın</span><span class="tag acc">${LV[u.lv]}</span></div>
+    <h3 style="margin:6px 0 2px;font-size:20px">${esc(u.t)}</h3>
+    <div class="small muted">Kalıp: ${esc(u.rule)}</div>
+    <div class="tiny" style="margin:14px 0 6px">Ne kadar destek istersin?</div>
+    <div class="seg" style="margin-bottom:6px">${[1,2,3,4].map(s=>`<button data-st="${s}" aria-selected="${st===s}">${STAGES[s].n}</button>`).join("")}</div>
+    <div class="small muted" style="margin-bottom:12px">${STAGES[st].d}</div>
+    <a class="btn primary block" href="#pratik/yaz/${u.id}">Başla · yaklaşık 10 dk</a></div>
+  ${showUp ? `<div class="card soft"><div class="small">Bu destekle <b>${W.count[st]}</b> yazı bitirdin 👏 Hazır hissediyorsan bir adım ileri: <b>${STAGES[st+1].n}</b>. Zor gelirse istediğin zaman geri dönebilirsin.</div>
+    <div class="row" style="margin-top:10px"><button class="btn primary" data-up>Deneyelim</button><button class="btn ghost" data-stay>Şimdilik böyle kalsın</button></div></div>` : ""}
+  <div class="grid2">
+    <div class="card" style="margin:0"><h3>✏️ Sadece 1 cümle</h3><div class="small muted" style="margin-bottom:8px">Hiç enerjin yoksa. Bugünü saymaya yeter.</div>
+      <div class="small" lang="en" style="margin-bottom:6px"><b>${esc(fr)}</b></div>
+      <input class="f" id="mc" lang="en" autocapitalize="sentences" value="${esc(fr.replace(/___/g,""))}" spellcheck="false">
+      <button class="btn" data-micro style="margin-top:8px">Kaydet</button></div>
+    <div class="card" style="margin:0"><h3>⏱️ 3 dakika serbest</h3><div class="small muted" style="margin-bottom:10px">Kimse okumaz, düzeltme yok. Durmadan aklına geleni yaz; bilmediğin kelimeyi Türkçe yaz.</div>
+      <a class="btn" href="#pratik/yaz/serbest">Başla</a></div>
+  </div>
+  <h2>İlerlemen</h2>
+  <div class="grid2"><div class="stat"><b>${W.sentences}</b><span>yazdığın cümle</span></div><div class="stat"><b>${Object.keys(W.done).length}</b><span>bitirdiğin ünite</span></div></div>
+  ${first && last && first!==last ? `<details class="card"><summary><b>İlk yazın ↔ son yazın</b></summary><div class="tiny" style="margin-top:10px">${esc(first.date)}</div><pre lang="en" style="white-space:pre-wrap;font:inherit;font-size:14.5px;margin:4px 0 10px">${esc(first.text)}</pre><div class="tiny">${esc(last.date)}</div><pre lang="en" style="white-space:pre-wrap;font:inherit;font-size:14.5px;margin:4px 0 0">${esc(last.text)}</pre></details>` : ""}
+  ${W.rules.length ? `<h2>Kural defterim</h2><div class="card small" style="padding:6px 18px">${W.rules.slice().reverse().map((r,i)=>`<div class="between" style="padding:8px 0;${i?"border-top:1px solid var(--line)":""}"><span>🔑 ${esc(r.text)}</span><span class="tiny">${esc(r.date)}</span></div>`).join("")}</div>` : ""}
+  <h2>Tüm üniteler</h2>
+  <div class="card" style="padding:4px 18px">${units}</div>
+  <details class="card small"><summary><b>Bu atölye neden böyle?</b></summary>
+    <ul style="margin:10px 0 0;padding-left:18px">
+     <li><b>Boş sayfa yok.</b> Önce örnek metin, sonra örneği değiştirme, sonra kalıplarla yazma, en son serbest yazma. Destek sen hazır oldukça azalır.</li>
+     <li><b>Az ve odaklı düzeltme.</b> Claude sadece en önemli 3 hatayı gösterir, doğrusunu hemen söylemez; ipucu verir, sen düzeltirsin. Kendi bulduğun hata daha kalıcı olur.</li>
+     <li><b>Tek kural.</b> Her hafta tek bir kurala odaklanırsın. Kural defterine yazarsın, sonraki yazılarda kontrol edersin.</li>
+     <li><b>Küçük adım, her gün.</b> Kötü bir günde 1 cümle bile zinciri korur. Bir günü kaçırmak sorun değil.</li>
+     <li><b>Serbest yazma kaygıyı azaltır.</b> Değerlendirilmeyen yazı, "yanlış yaparım" korkusunu gevşetir.</li></ul></details>
+  <h2>Yazılarım</h2>
+  <div class="card" style="padding:4px 18px">${S.journal.length ? S.journal.slice().reverse().map(j=>`<details class="entry"><summary><b>${esc(j.date)}</b> · <span class="muted small">${esc(j.prompt)}${j.stage?` · ${STAGES[j.stage].n}`:""}</span></summary><pre lang="en">${esc(j.text)}</pre>${j.text2?`<hr><div class="tiny">2. taslak</div><pre lang="en">${esc(j.text2)}</pre>`:""}${j.fb?`<hr><div class="tiny">Claude'un geri bildirimi</div><pre>${esc(j.fb)}</pre>`:""}</details>`).join("") : `<p class="small muted">Henüz yazı yok. İlki en zoru; 1 cümle bile sayılır.</p>`}</div>`;
+  el.onclick = e=>{
+    const s = e.target.closest("[data-st]"); if(s){ W.stage = +s.dataset.st; save(); wHome(el); return; }
+    if(e.target.closest("[data-up]")){ W.stage = st+1; save(); wHome(el); toast("Yeni destek seviyesi: "+STAGES[st+1].n); return; }
+    if(e.target.closest("[data-stay]")){ W.dismissUp = st; save(); wHome(el); return; }
+    if(e.target.closest("[data-micro]")){ const t = $("#mc").value.trim(); if(t.split(/\s+/).length<2){ toast("Bir cümle yaz, kısa olabilir"); return; }
+      S.journal.push({id:Date.now(), date:today(), prompt:"Tek cümle", text:t, kind:"tek cümle"}); W.micro++; W.sentences++; markWrite(); save(); toast("Kaydedildi. Bugün de yazdın ✓"); wHome(el); }
+  };
+}
+function wUnit(el, u){
+  const W = wr(); let stage = curStage(), showTr = false, hint = false, phase = "write", entry = null;
+  const dk = ()=>KEY+":wd:"+u.id+":"+stage;
+  const parts = u.model.split(/\[\[(.+?)\]\]/), plain = parts.join("");
+  const slotVals = {};
+  const getDraft = ()=>{ try{ return localStorage.getItem(dk()); }catch(e){ return null; } };
+  const setDraft = v=>{ try{ v==null ? localStorage.removeItem(dk()) : localStorage.setItem(dk(), v); }catch(e){} };
+  const frames = ()=>`<div class="tiny" style="margin:4px 0 6px">Kalıplar (dokun, yazıya eklensin; ___ yerine kendi kelimeni yaz)</div>
+    <div class="row" style="margin-bottom:10px">${u.frames.map(f=>`<button class="chip" lang="en" data-fr="${esc(f)}">${esc(f)}</button>`).join("")}</div>
+    <div class="tiny" style="margin:4px 0 6px">Kelime kutusu</div>
+    <div class="row" style="margin-bottom:10px">${u.bank.map(b=>`<button class="chip" lang="en" data-wb="${esc(b)}">${esc(b)}</button>`).join("")}</div>`;
   const draw = ()=>{
-    const draft = (()=>{ try{ return localStorage.getItem(KEY+":draft")||""; }catch(e){ return ""; } })();
-    el.innerHTML = `<div class="card"><div class="between"><span class="tag acc">Seviye ${LV[w]}</span><button class="btn ghost small" data-np>Başka konu</button></div>
-      <h3 style="margin-top:8px">${esc(prompts[pi])}</h3>
-      <textarea id="wt" rows="8" lang="en" spellcheck="false" placeholder="Doğrudan İngilizce yaz. Kelime bilmiyorsan (Türkçesini parantez içinde) yaz, sorun değil.">${esc(draft)}</textarea>
-      <div class="between" style="margin-top:8px"><span class="tiny" id="wc">0 kelime</span><div class="row"><button class="btn" data-save>Kaydet</button><button class="btn primary" data-fb>Claude'a düzelttir</button></div></div></div>
-      <p class="tiny">Yazım denetimi kapalı: kendi hatalarını görebilmen için. Claude metnini baştan yazmaz, hatalarını ve bir kural gösterir.</p>
-      <h2>Yazılarım</h2>
-      <div class="card" style="padding:4px 18px">${S.journal.length ? S.journal.slice().reverse().map(j=>`<details class="entry"><summary><b>${esc(j.date)}</b> · <span class="muted small">${esc(j.prompt)}</span></summary><pre lang="en">${esc(j.text)}</pre>${j.fb?`<hr><div class="tiny">Claude'un geri bildirimi</div><pre>${esc(j.fb)}</pre>`:""}</details>`).join("") : `<p class="small muted">Henüz yazı yok. İlki en zoru; 3 cümle bile yeter.</p>`}</div>`;
+    if(phase==="done") return drawDone();
+    const modelHtml = parts.map((p,i)=> i%2 ? `<b style="color:var(--accent)">${esc(p)}</b>` : esc(p)).join("");
+    let work;
+    if(stage===1) work = `<div class="passage" lang="en" style="line-height:2.3">${parts.map((p,i)=> i%2 ? `<input class="slot" data-i="${i}" placeholder="${esc(p)}" value="${esc(slotVals[i]||"")}" size="${Math.max(5,p.length+1)}" autocapitalize="off" spellcheck="false">` : esc(p)).join("")}</div>
+      <p class="tiny">Boş bıraktığın yerde örnekteki kelime kalır. Birkaçını değiştirmen bile yeter.</p>`;
+    else if(stage===2) work = `<textarea id="wt" rows="7" lang="en" spellcheck="false">${esc(getDraft() ?? plain)}</textarea>
+      <p class="tiny">Mor kelimeleri kendine göre değiştir, sonuna en az 1 cümle ekle. Bilmediğin kelimeyi (Türkçe) yazabilirsin.</p>`;
+    else work = `${stage===3 || hint ? frames() : `<button class="btn ghost" data-hint>💡 İpucu: kalıpları ve kelimeleri göster</button>`}
+      <textarea id="wt" rows="7" lang="en" spellcheck="false" placeholder="${stage===3 ? "Bir kalıba dokunarak başla…" : "3–5 cümle. Basit cümleler tamamen yeterli."}">${esc(getDraft() ?? "")}</textarea>
+      <p class="tiny">Bilmediğin kelimeyi (Türkçe) parantez içinde yaz, sorun değil.</p>`;
+    const myRules = W.rules.slice(-2).map(r=>`🔑 ${esc(r.text)}`);
+    const checks = [`Kalıbı kullandım: <i>${esc(u.rule)}</i>`, u.lv<=1 ? "Cümlelerim büyük harfle başlıyor, nokta ile bitiyor" : "En az bir bağlaç kullandım (because, so, but, however…)", ...myRules];
+    el.innerHTML = `<div class="between"><a class="btn ghost" href="#pratik/yaz">‹ Atölye</a><span class="tag acc">${LV[u.lv]} · ${STAGES[stage].n}</span></div>
+    <h2 style="margin-top:6px">${esc(u.t)}</h2>
+    <div class="card"><div class="between"><h3 style="margin:0">1 · Oku ve dinle</h3><div class="row">${playBtn(plain)}</div></div>
+      <div class="passage" lang="en" style="margin-top:10px">${modelHtml}</div>
+      ${u.tr ? `<button class="btn ghost small" data-tr>${showTr?"Türkçeyi gizle":"Türkçesi"}</button>${showTr?`<div class="small muted" style="margin-top:6px">${esc(u.tr)}</div>`:""}` : ""}
+      <div class="small" style="margin-top:10px;padding:10px 12px;background:var(--accent-soft);border-radius:10px">🔑 <b>Kalıp:</b> ${esc(u.rule)}</div></div>
+    <div class="card"><h3>2 · ${stage===1?"Kendi bilgilerinle doldur":stage===2?"Kendine göre değiştir":stage===3?"Kalıplarla kendi metnini yaz":"Kendi metnini yaz"}</h3>
+      ${stage===4 ? `<p class="small" style="margin:0 0 8px"><b>${esc(u.p)}</b></p>` : stage===3 ? `<p class="small muted" style="margin:0 0 8px">${esc(u.p)}</p>` : ""}
+      ${work}
+      <div class="tiny" id="wc"></div>
+      <div class="row" style="margin-top:6px"><button class="btn ghost small" data-easier ${stage===1?"disabled":""}>Bu zor geldi, daha çok destek</button></div></div>
+    <div class="card"><h3>3 · Hızlı kontrol</h3><div class="tiny" style="margin-bottom:4px">Mükemmel olması gerekmiyor, sadece bir göz at.</div>
+      ${checks.map(c=>`<label class="check"><input type="checkbox"><span class="small">${c}</span></label>`).join("")}</div>
+    <button class="btn primary block" data-finish>Bitirdim</button>`;
     const ta = $("#wt"), wc = $("#wc");
-    const upd = ()=>{ wc.textContent = (ta.value.trim().split(/\s+/).filter(Boolean).length)+" kelime"; try{ localStorage.setItem(KEY+":draft", ta.value); }catch(e){} };
-    ta.oninput = upd; upd();
-    const store = ()=>{ const text = ta.value.trim(); if(!text){ toast("Önce bir şeyler yaz"); return null; }
-      const j = {id:Date.now(), date:today(), prompt:prompts[pi], text, kind:"yazma"}; S.journal.push(j);
-      S.done[today()] = Object.assign({}, S.done[today()], DAYPLAN[new Date().getDay()]==="writing" ? {main:true} : {});
-      save(); try{ localStorage.removeItem(KEY+":draft"); }catch(e){} return j; };
-    el.onclick = e=>{
-      if(e.target.closest("[data-np]")){ pi = (pi+1) % prompts.length; draw(); return; }
-      if(e.target.closest("[data-save]")){ if(store()){ toast("Kaydedildi"); draw(); } return; }
-      if(e.target.closest("[data-fb]")){ const j = store(); if(!j) return; draw();
-        bridge("Yazını Claude'a düzelttir", P.writing(j.prompt, LV[w], j.text), {save:v=>{ const x=S.journal.find(y=>y.id===j.id); if(x){ x.fb=v; save(); draw(); } }}); }
-    };
+    if(ta){ const upd = save=>{ wc.textContent = countSentences(ta.value)+" cümle · "+ta.value.trim().split(/\s+/).filter(Boolean).length+" kelime"; if(save) setDraft(ta.value); }; ta.oninput = ()=>upd(true); upd(false); }
+    el.querySelectorAll(".slot").forEach(s=>s.oninput = ()=>{ slotVals[s.dataset.i] = s.value; });
+  };
+  const getText = ()=> stage===1 ? parts.map((p,i)=> i%2 ? ((el.querySelector(`.slot[data-i="${i}"]`)||{}).value || "").trim() || p : p).join("") : ($("#wt") ? $("#wt").value.trim() : "");
+  const drawDone = ()=>{
+    const n = countSentences(entry.text);
+    el.innerHTML = `<div class="card soft" style="text-align:center;padding:26px 18px"><div style="font-size:40px">🎉</div><h2 style="margin:6px 0">Yazdın!</h2>
+      <div class="small">Bu yazıda <b>${n}</b> cümle. Toplamda <b>${W.sentences}</b> cümle yazdın.</div></div>
+    <div class="card"><h3>İstersen Claude'a göster</h3><p class="small muted" style="margin:0 0 10px">Sadece en önemli 3 hatayı ipucuyla gösterir; doğrusunu en sonda verir. Önce sen düzeltmeyi dene.</p>
+      <button class="btn primary" data-fb>Claude'a göster</button></div>
+    <div class="card"><h3>Haftanın kuralını kaydet</h3><p class="small muted" style="margin:0 0 8px">Claude'un verdiği "BU HAFTANIN KURALI"nı buraya yaz. Sonraki yazılarda kontrol listende çıkar.</p>
+      <input class="f" id="rule" placeholder="Örn. He/She'den sonra fiile -s ekle"><button class="btn" data-rule style="margin-top:8px">Kural defterine ekle</button></div>
+    <div class="card"><h3>2. taslak (isteğe bağlı)</h3><p class="small muted" style="margin:0 0 8px">Geri bildirimden sonra metni temize çek. Düzelterek yeniden yazmak, öğrenmenin en kalıcı kısmı.</p>
+      <textarea id="t2" rows="6" lang="en" spellcheck="false">${esc(entry.text2 || entry.text)}</textarea><button class="btn" data-t2 style="margin-top:8px">2. taslağı kaydet</button></div>
+    <div class="row"><a class="btn" href="#pratik/yaz">Atölyeye dön</a>${stage<4?`<button class="btn ghost" data-again>Aynı üniteyi "${STAGES[stage+1].n}" ile dene</button>`:""}</div>`;
   };
   draw();
+  el.onclick = e=>{
+    if(e.target.closest("[data-tr]")){ showTr = !showTr; const v = $("#wt") && $("#wt").value; draw(); if(v!=null && $("#wt")) $("#wt").value = v; return; }
+    if(e.target.closest("[data-hint]")){ hint = true; draw(); return; }
+    const fr = e.target.closest("[data-fr]"); if(fr && $("#wt")){ insertAt($("#wt"), fr.dataset.fr); return; }
+    const wb = e.target.closest("[data-wb]"); if(wb && $("#wt")){ insertAt($("#wt"), wb.dataset.wb); return; }
+    if(e.target.closest("[data-easier]")){ stage = Math.max(1, stage-1); draw(); toast("Daha çok destek: "+STAGES[stage].n); return; }
+    if(e.target.closest("[data-finish]")){
+      const text = getText();
+      if(stage>=3 && countSentences(text)<1){ toast("En az bir cümle yaz. Bir kalıba dokunarak başlayabilirsin."); return; }
+      if(stage===2 && text===plain) toast("Hiç değiştirmedin, olsun. Bir dahakine 1 kelimeyle başla 🙂");
+      entry = {id:Date.now(), date:today(), prompt:u.t, text, kind:"yazma", unit:u.id, stage};
+      S.journal.push(entry); W.done[u.id] = Math.max(W.done[u.id]||0, stage); W.count[stage] = (W.count[stage]||0)+1; W.sentences += countSentences(text);
+      markWrite(); setDraft(null); save(); phase = "done"; draw(); window.scrollTo(0,0); return;
+    }
+    if(e.target.closest("[data-fb]")) bridge("Yazını Claude'a göster", wfocus(u, stage, LV[u.lv], entry.text2 || entry.text), {save:v=>{ entry.fb = v; const m = v.match(/BU HAFTANIN KURALI[^:\n]*[:\-–]\s*(.+)/i); if(m && $("#rule")) $("#rule").value = m[1].replace(/\*+/g,"").trim(); save(); }, tip:"Claude ipucu verince cevaplara bakmadan önce 2. taslakta kendin düzeltmeyi dene."});
+    if(e.target.closest("[data-rule]")){ const r = $("#rule").value.trim(); if(!r){ toast("Kuralı yaz"); return; } W.rules.push({text:r, date:today()}); save(); toast("Kural defterine eklendi 🔑"); $("#rule").value=""; }
+    if(e.target.closest("[data-t2]")){ entry.text2 = $("#t2").value.trim(); save(); toast("2. taslak kaydedildi"); }
+    if(e.target.closest("[data-again]")){ stage = Math.min(4, stage+1); phase = "write"; entry = null; hint = false; draw(); window.scrollTo(0,0); }
+  };
+}
+function wFree(el){
+  const LIMIT = 180; let left = LIMIT, timer = null, finished = false;
+  el.innerHTML = `<div class="between"><a class="btn ghost" href="#pratik/yaz">‹ Atölye</a><span class="tag acc" id="ft">3:00</span></div>
+  <h2 style="margin-top:6px">3 dakika serbest yazma</h2>
+  <p class="small muted">Kimse okumayacak, düzeltme yok, Claude'a gitmiyor. Durmadan yaz. Takılırsan "I don't know what to write" yaz ve devam et. Bilmediğin kelimeyi Türkçe yaz. Süre ilk harfte başlar.</p>
+  <div class="row" style="margin-bottom:8px">${["Today I feel…","Right now I can see…","I want to…","My favourite…"].map(s=>`<button class="chip" data-fs="${esc(s)}" lang="en">${esc(s)}</button>`).join("")}</div>
+  <textarea id="fw" rows="10" lang="en" spellcheck="false" placeholder="Start here…"></textarea>
+  <div id="fend"></div>`;
+  const ta = $("#fw"), ft = $("#ft");
+  const end = ()=>{ if(finished) return; finished = true; clearInterval(timer); ta.readOnly = true;
+    const words = ta.value.trim().split(/\s+/).filter(Boolean).length;
+    $("#fend").innerHTML = `<div class="card soft" style="margin-top:12px"><h3>Süre doldu ⏱️</h3><div class="small"><b>${words}</b> kelime yazdın. Kaygıya rağmen yazdın, asıl başarı bu.</div>
+      <div class="row" style="margin-top:10px"><button class="btn primary" data-keep>Sakla</button><button class="btn" data-drop>Sil gitsin</button></div></div>`; };
+  ta.addEventListener("input", ()=>{ if(!timer && !finished){ timer = setInterval(()=>{ left--; ft.textContent = Math.floor(left/60)+":"+String(left%60).padStart(2,"0"); if(left<=0) end(); }, 1000); } });
+  el.onclick = e=>{
+    const fs = e.target.closest("[data-fs]"); if(fs && !finished){ insertAt(ta, fs.dataset.fs.replace("…"," ")); return; }
+    const keep = e.target.closest("[data-keep]"), drop = e.target.closest("[data-drop]");
+    if(keep || drop){ const W = wr(); W.free++; markWrite();
+      if(keep && ta.value.trim()) S.journal.push({id:Date.now(), date:today(), prompt:"3 dk serbest yazma", text:ta.value.trim(), kind:"serbest"});
+      save(); toast(keep ? "Saklandı" : "Silindi. Yine de bugün yazdın ✓"); location.hash = "#pratik/yaz"; }
+  };
 }
 function pSpeak(el){
   const w = workOf("speaking"), b = band(w), sents = SENT[w];
