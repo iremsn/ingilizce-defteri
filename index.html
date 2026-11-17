@@ -2073,7 +2073,7 @@ function vCards(m, sub){
        <div class="small muted">${pStarted} kart başladı, ${pKnown} tanesi oturdu. Eş anlamlılar gruplar halinde gelir: kartın ön yüzünde her seferinde gruptan farklı bir kelime çıkar, arkasında hepsi yazar.</div>
        <div class="between"><span class="small">Günde yeni sınav kartı</span><div class="row">${[0,3,5,8,12].map(n=>`<button class="chip" data-pp="${n}" aria-pressed="${(S.settings.packPerDay??5)===n}">${n}</button>`).join("")}</div></div>
        <a class="btn" href="#kelime/es">Eş anlamlı testi (10 soru)</a></div>`
-     : `<div class="card stack"><h3 style="margin:0">🎓 Kurs paketi yükle</h3><p class="small muted" style="margin:0">Test Atölyesi kelime listesini (1.100+ eş anlamlı kelime ve 91 phrasal verb) senin için hazırladım. Masaüstündeki <b>ingilizce-paket</b> klasöründeki dosyayı bir kez seç; Drive eşitlemesiyle telefonuna da geçer. Paket sadece sende kalır, sitede yayınlanmaz.</p>
+     : `<div class="card stack"><h3 style="margin:0">🎓 Kurs paketi yükle</h3><p class="small muted" style="margin:0">Test Atölyesi kelime listesini (1.100+ eş anlamlı kelime ve 91 phrasal verb) senin için hazırladım. Bilgisayarda düğmeye bas ve şu dosyayı seç: <b>Masaüstü › claude ile hayatı kolaylaştır › ingilizce-paket › test-atolyesi-kelime.json</b>. Bir kez yüklemen yeter; Drive eşitlemesi açıksa telefonuna da kendiliğinden geçer. Paket sadece sende kalır, sitede yayınlanmaz.</p>
        <label class="btn">Paket dosyasını seç<input type="file" accept="application/json,.json" data-pack hidden></label></div>`;
     const finished = CS && CS.total;
     m.innerHTML = `<h1>Kelime</h1><p class="sub">Aralıklı tekrar: bildiğin kart giderek daha seyrek gelir, bilemediğin yarın tekrar gelir.</p>
