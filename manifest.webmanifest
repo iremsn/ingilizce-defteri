@@ -1,0 +1,16 @@
+{
+  "name": "İngilizce Defteri",
+  "short_name": "İngilizce",
+  "description": "Seviye testi, günlük 15 dakikalık plan, kelime kartları ve pratik.",
+  "lang": "tr",
+  "start_url": "./#bugun",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F5F2FA",
+  "theme_color": "#F5F2FA",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
