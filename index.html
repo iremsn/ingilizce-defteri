@@ -1279,7 +1279,7 @@ function vLesson(m, L){
   ${sec("⚠️","Türklerin tuzağı")}<div class="card trap">${L.trap.map(([x,v,note])=>`<div style="padding:6px 0"><div class="x" lang="en">✗ ${esc(x)}</div><div class="v" lang="en">✓ ${esc(v)}</div><div class="small muted">${esc(note)}</div></div>`).join("")}</div>
   ${sec("✏️","Alıştırma")}<div class="card"><p class="small" style="margin:0 0 10px">${L.q.length} kısa soru. Yanlış yaptıkların sonda bir kez daha gelir; %70 ve üstü ile ders tamam sayılır.</p>
   <a class="btn primary block" href="#gramer/${L.id}/pratik">Alıştırmaya geç →</a></div>
-  ${(()=>{ const u = LESSONS.indexOf(L)+1, dn = (game().done||{})["g"+u]; return `<div class="card soft small">📕 <b>Dilbilgisi Kitabı · Ünite ${u}</b>: aynı ders kâğıt üstünde. A–C buradaki sorular; D (yeni sorular) ve E'yi (kendi cümlen) kalemle çöz. ${dn ? `<span class="tag ok">kitapta bitti ✓</span>` : `<button class="btn sm" data-gtick="g${u}" data-xp="30" data-l="Dilbilgisi Ünite ${u}">Kitapta bitirdim · +30 XP</button>`}</div>`; })()}
+  ${(()=>{ const u = LESSONS.indexOf(L)+1, eg = S.pack && S.pack.egiu && S.pack.egiu[u]; return `<div class="card soft small">🎮 Ünite ${u}: alıştırmayı geçince İlerleme Oyunu'na <b>+30 XP</b> kendiliğinden yazılır.${eg ? `<div style="margin-top:6px">📘 <b>Takıldıysan</b> (%85'in altı): ${esc(eg)} · takviye klasöründeki kitapta, s. = PDF sayfası.</div>` : ""}</div>`; })()}
   <p class="tiny" style="text-align:center"><a href="#" data-ask style="color:inherit">Hâlâ karışık mı? Claude'a bu konuyu başka örneklerle anlattır</a></p>`;
   m.onclick = e=>{ if(gameClick(e, ()=>vLesson(m, L))) return; if(e.target.closest("[data-ask]")){ e.preventDefault(); bridge("Gramer: "+L.t, P.grammar(L.t, LV[L.lv])); } };
 }
@@ -1448,7 +1448,8 @@ function buildDict(){
   WORDS.forEach(w=>add(w[0], {tr:w[1], ex:w[2]}));
   (S.custom||[]).forEach(c=>add(c.en, {tr:c.tr, ex:c.ex}));
   if(S.pack){ (S.pack.groups||[]).forEach(g=>g.en.forEach(e=>add(e, {tr:g.tr, syn:g.en.filter(x=>x!==e).join(", ")})));
-    (S.pack.phrasal||[]).forEach(([e,tr])=>add(e, {tr})); (S.pack.multi||[]).forEach(x=>add(x.en, {tr:x.tr})); }
+    (S.pack.phrasal||[]).forEach(([e,tr])=>add(e, {tr})); (S.pack.multi||[]).forEach(x=>add(x.en, {tr:x.tr}));
+    (S.pack.reads||[]).forEach(r=>(r.gl||[]).forEach(([e,tr])=>add(e, {tr}))); }
 }
 function lookup(w){
   if(!DICT) buildDict();
@@ -1457,11 +1458,55 @@ function lookup(w){
   for(const c of cands){ if(DICT.has(c)) return Object.assign({w:c}, DICT.get(c)); }
   return null;
 }
-let RD = null;
-function pRead(el){
-  if(!RD || !RD.text){
+let RD = null, BR = null;
+function bookReads(){ return (S.pack && S.pack.reads) || []; }
+function tokHTML(s){ return s.split(/(\s+)/).map(p=>{ const m = p.match(/^([^A-Za-z']*)([A-Za-z'’-]+)([^A-Za-z']*)$/); if(!m) return esc(p);
+  return esc(m[1])+`<span class="tk ${lookup(m[2])?"known":""}" data-w="${esc(m[2])}">${esc(m[2])}</span>`+esc(m[3]); }).join(""); }
+/* Okuma Kitabı metni (özel paketten): oku → sorular → kontrol → yazma görevi */
+function bookRead(el, id){
+  const R = bookReads().find(r=>r.id===id); if(!R){ location.hash = "#pratik/oku"; return; }
+  const g = game(); g.rd = g.rd || {}; if(!BR || BR.id!==id) BR = {id, a:{}, chk:false, t0:0};
+  const paras = R.sec ? R.sec.flatMap(s=>s[1]) : R.p, all = paras.join(" ");
+  RD = {text: all, title: R.t, lv: R.lv, book: true};
+  const body = R.sec ? R.sec.map(([h,ps])=>`<h3 style="margin:14px 0 4px">${esc(h)}</h3>`+ps.map(p=>`<p>${tokHTML(p)}</p>`).join("")).join("") : paras.map(p=>`<p>${tokHTML(p)}</p>`).join("");
+  const Q = [...(R.tf||[]).map(([t,v])=>({t, o:["Doğru","Yanlış"], a:v?0:1})), ...(R.q||[]).map(([t,o,a])=>({t, o, a})), ...(R.main?[{t:R.main[0], o:R.main[1], a:R.main[2], m:1}]:[])];
+  const right = Q.filter((q,i)=>BR.a[i]===q.a).length, prev = g.rd[id];
+  const mins = BR.t0 ? Math.round((Date.now()-BR.t0)/60000) : 0;
+  el.innerHTML = `<div class="between"><a class="btn ghost" href="#pratik/oku">‹ Metinler</a><span class="tag acc">${esc(R.lv)}</span></div>
+  <div class="tiny" style="margin-top:8px">OKUMA KİTABI · METİN ${esc(String(R.n))} · ${esc(R.th)}</div><h2 style="margin:2px 0 6px">${esc(R.t)}</h2>
+  ${prev ? `<p class="tiny" style="margin:0 0 6px">En iyi sonucun: ${prev.best}/${prev.of} (${prev.d})</p>` : ""}
+  ${R.min ? `<div class="card soft small">⏱️ Süre hedefi <b>${R.min} dakika</b>, sözlük yok. ${BR.t0 ? `Başladın: ${mins} dk geçti.` : `<button class="btn sm" data-t0>Süreyi başlat</button>`}</div>` : `<div class="card soft small">Üç tur: göz gezdir → dikkatli oku → sesli oku. Her kelimeyi anlaman gerekmiyor; en fazla 5 kelimeye dokun.</div>`}
+  <div class="row" style="margin-bottom:8px">${playBtn(all, "Hepsini dinle")}</div>
+  <div class="card reader" lang="en">${body}</div><div id="wbox"></div>
+  <details class="card"><summary class="small"><b>Sözlük (${(R.gl||[]).length} kelime)</b></summary><div class="small" style="margin-top:8px;line-height:1.8">${(R.gl||[]).map(([e,t])=>`<span lang="en"><b>${esc(e)}</b></span> ${esc(t)}`).join(" · ")}</div></details>
+  <h2>Sorular</h2><div class="card">${Q.map((q,i)=>`<div style="padding:8px 0;border-top:${i?"1px solid var(--line)":"0"}"><div class="small"${q.o[0]==="Doğru"?"":' lang="en"'}><b>${i+1}.</b> ${q.m?"<b>Ana fikir:</b> ":""}${esc(q.t)}</div>
+    <div class="row" style="margin-top:6px;gap:6px">${q.o.map((o,j)=>{ const sel = BR.a[i]===j, ok = BR.chk && j===q.a, bad = BR.chk && sel && j!==q.a;
+      return `<button class="chip" data-qa="${i}:${j}" style="${sel?"outline:2px solid var(--acc);":""}${ok?"background:#2e9e6a;color:#fff;":""}${bad?"background:#e08a2e;color:#fff;":""}"${q.o[0]==="Doğru"?"":' lang="en"'}>${esc(o)}</button>`; }).join("")}</div></div>`).join("")}
+   ${BR.chk ? `<div class="card soft" style="margin:10px 0 0"><b>${right}/${Q.length} doğru (%${Math.round(100*right/Q.length)})</b>${R.min?` · ${mins} dakika`:""}<div class="small" style="margin-top:4px">${right/Q.length>=.9?"Harika! Sürekli böyleyse bir üst seviyeden metin dene.":right/Q.length>=.7?"Tam %85 bölgesindesin, böyle devam.":"Bu metin şimdilik zorladı. Turuncu yanlışların kanıt cümlesini metinde bul; yarın bir kolay metin oku."}</div></div>`
+     : `<button class="btn primary block" data-chk style="margin-top:10px">Kontrol et</button>`}</div>
+  ${R.task ? `<h2>Yazma görevi</h2><div class="card stack"><p class="small" style="margin:0">${esc(R.task)}</p><textarea id="btask" rows="4" lang="en" placeholder="Write here…">${esc((prev&&prev.task)||"")}</textarea>
+   <div class="row"><button class="btn sm" data-tsave>Kaydet</button><button class="btn ghost sm" data-tcl>Claude'a kontrol ettir</button></div></div>` : ""}`;
+  el.onclick = e=>{
+    if(e.target.closest("[data-t0]")){ BR.t0 = Date.now(); bookRead(el, id); return; }
+    const qa = e.target.closest("[data-qa]"); if(qa && !BR.chk){ const [i,j] = qa.dataset.qa.split(":").map(Number); BR.a[i] = j; bookRead(el, id); return; }
+    if(e.target.closest("[data-chk]")){ if(Object.keys(BR.a).length < Q.length && !confirm("Boş bıraktığın sorular var. Yine de kontrol edeyim mi?")) return;
+      BR.chk = true; const r = Q.filter((q,i)=>BR.a[i]===q.a).length, p = g.rd[id];
+      if(!p || r > p.best) g.rd[id] = Object.assign({}, p, {best:r, of:Q.length, d:today()}); save(); bookRead(el, id); return; }
+    if(e.target.closest("[data-tsave]")){ g.rd[id] = Object.assign({best:0, of:Q.length, d:today()}, g.rd[id], {task: $("#btask").value}); save(); toast("Kaydedildi"); return; }
+    if(e.target.closest("[data-tcl]")){ const t = $("#btask").value.trim(); if(!t){ toast("Önce birkaç cümle yaz"); return; }
+      bridge("Yazma görevimi kontrol et", `Ben Türkçe konuşan bir İngilizce öğrencisiyim (${R.lv}). "${R.t}" metnini okudum. Görev: ${R.task}\nYazdığım:\n${t}\n\nEn fazla 3 hatamı ipucu vererek göster, nedenini Türkçe tek cümleyle açıkla, doğru hâllerini en sonda ver. Bir şeyi iyi yaptıysam onu da söyle.`); return; }
+    const tk = e.target.closest(".tk"); if(tk){ el.querySelectorAll(".tk.sel").forEach(x=>x.classList.remove("sel")); tk.classList.add("sel"); wordBox(tk.dataset.w); speak(tk.dataset.w); return; }
+    if(e.target.closest("[data-addw]")){ const w = e.target.closest("[data-addw]").dataset.addw, tr = ($("#wtr")||{}).value || e.target.closest("[data-addw]").dataset.tr;
+      if(!tr){ toast("Türkçe anlamını yaz"); return; } const nid = "u:"+Date.now(); S.custom.push({id:nid, en:w, tr, ex:sentenceOf(w)}); S.cards[nid] = {box:0, due:today()}; DICT = null; save(); toast("Kartlarına eklendi"); wordBox(w); }
+  };
+}
+function pRead(el, arg){
+  if(arg && bookReads().length) return bookRead(el, arg);
+  if(!RD || !RD.text || RD.book){ RD = null;
+    const br = bookReads(), rd = (S.game && S.game.rd) || {};
     el.innerHTML = `<div class="card small"><b>Okurken kaybolmamak için 4 adım:</b><ol style="margin:6px 0 0;padding-left:20px"><li>Başlığa ve ilk cümleye bak: konu ne?</li><li>Bir kez durmadan oku. Her kelimeyi anlaman gerekmiyor.</li><li>Anlamı önemli görünen en fazla 5 kelimeye dokun.</li><li>Ana fikri Türkçe tek cümleyle yaz, Claude'a kontrol ettir.</li></ol></div>
-    <h2>Bir metin seç</h2>${READS.map((r,i)=>`<button class="card lrow" style="width:100%;border:0;text-align:left;cursor:pointer" data-rd="${i}"><span class="tag acc">${r.lv}</span><span style="flex:1">${esc(r.t)}</span>›</button>`).join("")}
+    ${br.length ? `<h2>Okuma Kitabı</h2><details class="card" open><summary class="small"><b>${br.length} metin</b> · A1'den B2'ye, sorular ve sözlükle</summary>${br.map(r=>`<a class="lrow" href="#pratik/oku/${r.id}" style="color:inherit;text-decoration:none"><span class="tag acc">${esc(r.lv)}</span><span style="flex:1" class="small"><b>${esc(String(r.n))}.</b> ${esc(r.t)}</span>${rd[r.id]&&rd[r.id].of?`<span class="tiny">${rd[r.id].best}/${rd[r.id].of}</span>`:""}›</a>`).join("")}</details>` : ""}
+    <h2>${br.length ? "Kısa metinler" : "Bir metin seç"}</h2>${READS.map((r,i)=>`<button class="card lrow" style="width:100%;border:0;text-align:left;cursor:pointer" data-rd="${i}"><span class="tag acc">${r.lv}</span><span style="flex:1">${esc(r.t)}</span>›</button>`).join("")}
     <h2>Ya da kendi metnini yapıştır</h2><div class="card stack"><p class="small muted" style="margin:0">Ders notu, sınav okuma parçası, bir haber, bir mail… Metin sadece bu cihazda kalır.</p>
     <textarea id="rdx" rows="5" lang="en" placeholder="Paste an English text here…"></textarea><button class="btn" data-own>Okumaya başla</button></div>`;
     el.onclick = e=>{ const b = e.target.closest("[data-rd]"); if(b){ const r = READS[+b.dataset.rd]; RD = {text:r.x, title:r.t, lv:r.lv}; pRead(el); return; }
@@ -1529,7 +1574,7 @@ const LV_HOURS = [100, 200, 375, 550, 800];
 const PACES = {
   20:{n:"Hafif", items:["Bugün akışı: Kelime → Gramer → Cümle kur"]},
   45:{n:"Dengeli", items:["Bugün akışı (18 dk)","Bonus görev: okuma, dinleme ya da konuşma (12 dk)","15 dk İngilizce altyazılı dizi ya da video"]},
-  60:{n:"Kararlı", items:["Bugün akışı (18 dk)","Bonus görev (12 dk)","15 dk dizi ya da video","15 dk kitap: gramer ya da okuma kitabından 1 bölüm"]},
+  60:{n:"Kararlı", items:["Bugün akışı (18 dk)","Bonus görev (12 dk)","15 dk dizi ya da video","15 dk okuma: Pratik › Oku'dan bir Okuma Kitabı metni"]},
   90:{n:"Yoğun", items:["Bugün akışı (18 dk)","Bonus görev (12 dk)","Gramer sekmesinden 2. ders (8 dk)","20 dk kitap bölümü","30 dk dizi / podcast, sınav kelime paketi günde 12 kart"]},
   180:{n:"Kamp", items:["Bugün akışı (18 dk)","Gramer: 2–3 ders + tekrar (25 dk)","Kelime: sınav paketi günde 20 kart + eş anlamlı testi (20 dk)","Okuma: 2 metin, Pratik → Oku ya da okuma kitabı (30 dk)","Dinleme: 1 saat. Önce metne bakmadan not alarak dinle, sonra metinle tekrar dinle.","Yazma / konuşma: Claude ile 20 dk (paragraf, essay ya da sohbet)","Haftada bir: koç raporu ve deneme"]}
 };
@@ -1771,15 +1816,15 @@ const GSTAGES = [
   weeks:[[[1,2],"Metin 1","","⭐ İlk İngilizce kitabın! İlk ses kaydı, okuma hızı ölçümü #1"],[[3,4],"Metin 2","","İkinci okumada ne kadar hızlandığını not et"],[[5,6],"Metin 3","",""],[[7,8],"Metin 4","","A1 bitti: Dilbilgisi 1–8"],[[9,10],"Metin 5","",""],[[11,12],"Metin 6","","Okuma hızı #2 · Ses kaydı #2"],[[13,14],"Metin 7","",""],[[15,16],"Metin 8","","BOSS haftası"]], bossAt:8, boss:"A2 seviyesinde örnek okuma-yazma sınavı. Geçme çizgisi: okuma sorularının %70'i."},
  {n:"Maket Atölyesi", lv:"A2 → B1", goal:"Deneyim anlat, varsayım kur, okumayı genişlet.",
   can:["Bir deneyimimi Present Perfect ve Past Simple'ı karıştırmadan anlatabilirim.","Bir tasarım projemi 1 dakika İngilizce anlatabilirim.","Bir staj ilanını anlayıp kısa bir başvuru yazabilirim.","Okuduğum bir metni kendi cümlelerimle özetleyebilirim."],
-  weeks:[[[17],"Metin 9","",""],[[18],"Metin 10","",""],[[19],"Metin 11","","Ses kaydı #3: ilk kaydınla karşılaştır"],[[20],"Metin 12","","Okuma hızı #3"],[[21],"Metin 17","",""],[[22],"Metin 18","",""],[[23],"Metin 9–12'yi süre tutarak yeniden oku","","Akıcılık haftası"],[[24],"","","B1 bitti: Dilbilgisi 17–24"],["Ünite 1–24: her ünitenin D bölümünü yeniden çöz","","","Genel tekrar"],["Hata defterindeki en sık 10 hatayı yeniden yaz","","","BOSS haftası"]], bossAt:10, boss:"Okuma Kitabı Metin 13 (ilk B2 metni): sözlüksüz, tek oturumda oku ve soruları cevapla. Geçme çizgisi: %70."},
- {n:"Prototip Kampı", lv:"B1 → B2", goal:"Kurs kampı. Asıl iş Kurs Rehberi'nde; bu tablo yanına neyin geleceğini söyler.",
+  weeks:[[[17],"Metin 9","",""],[[18],"Metin 10","",""],[[19],"Metin 11","","Ses kaydı #3: ilk kaydınla karşılaştır"],[[20],"Metin 12","","Okuma hızı #3"],[[21],"Metin 17","",""],[[22],"Metin 18","",""],[[23],"Metin 9–12'yi süre tutarak yeniden oku","","Akıcılık haftası"],[[24],"","","B1 bitti: Dilbilgisi 17–24"],["Gramer › Tekrar: %85 altı kalan ünitelerini yeniden çöz","","","Genel tekrar"],["Hata defterindeki en sık 10 hatayı yeniden yaz","","","BOSS haftası"]], bossAt:10, boss:"Okuma Kitabı Metin 13 (ilk B2 metni): sözlüksüz, tek oturumda oku ve soruları cevapla. Geçme çizgisi: %70."},
+ {n:"Prototip Kampı", lv:"B1 → B2", goal:"Kurs kampı. Her gün kurs klasöründe o günün dosyaları: kurs/Hafta-NN/Gun-N. Aşağıdaki görevler hangi dosyayı nasıl çalışacağını söyler.",
   can:["Kursun günlük paketini süre içinde bitirebilirim.","Bir restatement sorusunda yanlış şıkların neden yanlış olduğunu söyleyebilirim.","Bir B2 metninde yazarın tutumunu ve ana fikrini bulabilirim.","250 kelimelik bir essay yazabilirim.","Akademik bir dinleme kaydında not alıp soruları cevaplayabilirim."],
-  weeks:[[[25,26,27],"Metin 9–10 ve Metin 17","H1","Kurs başlıyor: Kurs Rehberi Hafta 1"],[[28,29,40],"Metin 11–12","H2",""],[[30,31,32,33],"Metin 13","H3",""],[[34,36,39],"Metin 14","H4",""],[[35],"Metin 15","H5","Restatement haftası · Ses kaydı #4"],[[37,38],"Metin 16 + Metin 13–16'yı süre tutarak tekrar","H6","Essay başlıyor (cumartesi)"],["Sınav köşeleri tekrarı","Metin 18 + Uzun metin U1","H7","BOSS: Uzun metin U1"],["Sınav köşeleri tekrarı","Metin 19–20 + Uzun metin U2","H8",""],["Sınav köşeleri tekrarı","Uzun metin U3","H9",""],["Sınav köşeleri tekrarı","Metin 21–22 + Uzun metin U4","H10","Okuma hızı #4 · kurs bitti"]],
-  listen:[[1,4],[5,7],[8,10],[11,12],[13,15],[16,18],[19,21],[22,24],[25,27],[28,30]], bossAt:7, boss:"Okuma Kitabı'nın sonundaki Uzun metin U1. Süre 25 dakika, sözlük yok. Geçme çizgisi: 14 sorudan 10'u."},
+  weeks:[[[25,26,27],"Metin 9–10 ve Metin 17","H1","Kurs başlıyor: önce kurs/00-Baslangic/2-Dinleme-stratejisi"],[[28,29,40],"Metin 11–12","H2",""],[[30,31,32,33],"Metin 13","H3",""],[[34,36,39],"Metin 14","H4",""],[[35],"Metin 15","H5","Restatement haftası · Ses kaydı #4"],[[37,38],"Metin 16 + Metin 13–16'yı süre tutarak tekrar","H6","Essay başlıyor (cumartesi)"],["Gramer tekrarı: B2 üniteleri","Metin 18 + Uzun metin U1","H7","BOSS: Uzun metin U1"],["Gramer tekrarı: B2 üniteleri","Metin 19–20 + Uzun metin U2","H8",""],["Gramer tekrarı: B2 üniteleri","Uzun metin U3","H9",""],["Gramer tekrarı: B2 üniteleri","Metin 21–22 + Uzun metin U4","H10","Okuma hızı #4 · kurs bitti"]],
+  listen:[[1,4],[5,7],[8,10],[11,12],[13,15],[16,18],[19,21],[22,24],[25,27],[28,30]], bossAt:7, boss:"Uzun metin U1 (Pratik › Oku, süreyi başlat). Süre 25 dakika, sözlük yok. Geçme çizgisi: 14 sorudan 10'u."},
  {n:"Lansman", lv:"B2 → Proficiency", goal:"Yeni konu yok. Bildiklerini sınav koşullarında hızlı ve sakin kullan. Her hafta 4–5 görev yeter.",
   can:["650–750 kelimelik akademik bir metni 20–25 dakikada okuyup soruları cevaplayabilirim.","Tam bir örnek sınavı süre içinde bitirebilirim.","Bir essay'i 40 dakikada planlayıp yazabilirim.","Bir mülakatta kendimi ve bir projemi 2 dakika İngilizce anlatabilirim."],
   weeks:[0,0,0,0,0,0], bossAt:6, boss:"İTÜ YDY'nin yayımladığı bir örnek sınavı, sınav süresiyle baştan sona çöz. Geçme puanına ulaştıysan Seviye 20: Ödül. Ulaşamadıysan zayıf bölümün aşamasına bir hafta geri dön."}];
-const S4_TASKS = [["Haftada bir İTÜ YDY örnek sınavı (süreli)",40],["Uzun metinler U2–U4'ü ikinci kez, 20 dakikada",25],["Essay ×2 (birini Claude'a puanlat)",30],["Resmî dil / e-posta / CV kelime ünitesi",15],["Kelime Kitabı 5. ve 10. hafta genel tekrar testleri",30],["Hata defteri: en sık 20 hata, 3'er kez",10],["Okuma hızı son ölçüm",10]];
+const S4_TASKS = [["Haftada bir İTÜ YDY örnek sınavı (süreli)",40],["Uzun metinler U2–U4'ü ikinci kez, 20 dakikada",25],["Essay ×2 (birini Claude'a puanlat)",30],["Resmî dil / e-posta / CV kelime ünitesi",15],["Kurs kelimeleri: eş anlamlı testi, haftada 3 kez",30],["Hata defteri: en sık 20 hata, 3'er kez",10],["Okuma hızı son ölçüm",10]];
 function game(){ if(!S.game){ const nl = nextLesson(), u = nl ? LESSONS.indexOf(nl)+1 : 41; S.game = {stage: u<=16?1:u<=24?2:3, week: 1, done:{}, log:[], err:[], wpm:[], rec:[], env:{}, lvd:{}, rev:{}, dice:{}, boss:{}, sc:[]}; } return S.game; }
 function autoXP(){ let x = 0; Object.values(S.done||{}).forEach(d=>{ if(d && d.cards && d.gram) x += 5; }); Object.values(gr().done).forEach(d=>{ if(d.pass && (d.best||0)>=85) x += 10; }); return x; }
 function gXP(){ const g = game(); let x = 50 + autoXP(); Object.values(g.done).forEach(d=>x += d.xp||0); (g.log||[]).forEach(e=>x += e.xp||0); return x + Math.floor((g.err||[]).length/5)*10; }
@@ -1798,22 +1843,30 @@ function weekItems(s, w){
   else { const [g, r, v] = st.weeks[w-1];
     if(Array.isArray(g)) g.forEach(u=>{ const L = LESSONS[u-1]; it.push({k:"g"+u, l:`Dilbilgisi Ünite ${u} · ${L ? L.t : ""}`, xp:30, href: L ? "#gramer/"+L.id : ""}); });
     else it.push({k:`${key}-g`, l:"Dilbilgisi: "+g, xp:30});
-    if(r) it.push({k:`${key}-r`, l:"Okuma Kitabı: "+r, xp:25});
-    if(s===3){ [1,2,3].forEach(n=>it.push({k:`${key}-c${n}`, l:`Kurs Gün ${n}: paket + ertesi gün kontrol`, xp:40}));
-      const [a,b] = st.listen[w-1]; for(let n=a;n<=b;n++) it.push({k:`L${n}`, l:`Kurs dinleme ${String(n).padStart(2,"0")} (5 adım)`, xp:20});
-      it.push({k:`${key}-kd`, l:`Kelime Kitabı ${v}: 5 günlük blok`, xp:75}, {k:`${key}-kt`, l:`Kelime Kitabı ${v}: haftalık test + haftanın hikâyesi`, xp:30}); } }
+    if(r) it.push({k:`${key}-r`, l:"Okuma: "+r, xp:25, links: readLinks(r)});
+    if(s===3){ const ww = String(w).padStart(2,"0");
+      [1,2,3].forEach(n=>it.push({k:`${key}-c${n}`, l:`Kurs Gün ${n}: kurs/Hafta-${ww}/Gun-${n} · not → paket (süre tut) → ertesi gün kontrol`, xp:40}));
+      const [a,b] = st.listen[w-1]; for(let n=a;n<=b;n++) it.push({k:`L${n}`, l:`Kurs dinleme ${String(n).padStart(2,"0")} (kurs/Hafta-${ww}/Dinleme): başlık → dinle → tekrar dinle → metinle dinle → gölge oku`, xp:20});
+      it.push({k:`${key}-kd`, l:`Kurs kelimeleri (${v}): her gün yeni kartlar, her kelimeyle bir cümle`, xp:75, href:"#kelime"}, {k:`${key}-kt`, l:`Kurs kelimeleri (${v}): eş anlamlı testi`, xp:30, href:"#kelime/es"}); } }
   ((pk && pk.w && pk.w[key]) || []).forEach(([l,xp],i)=>it.push({k:`${key}-p${i}`, l, xp, sup:true}));
   return it;
 }
+/* "Metin 9–10 ve Metin 17", "Uzun metin U1" → uygulamadaki Okuma Kitabı metinlerine bağlantılar */
+function readLinks(r){ if(!bookReads().length) return []; const out = [];
+  r.replace(/Metin (\d+)(?:–(\d+))?/g, (m,a,b)=>{ for(let n=+a;n<=+(b||a);n++) out.push([`Metin ${n}`, "#pratik/oku/k"+n]); return m; });
+  r.replace(/\bU(\d)\b/g, (m,a)=>{ out.push([`Uzun metin U${a}`, "#pratik/oku/u"+a]); return m; });
+  return out; }
+/* uygulamada geçilen gramer dersi = oyundaki Dilbilgisi ünitesi tamam */
+function syncGram(){ const g = game(); LESSONS.forEach((L,i)=>{ const d = gr().done[L.id], k = "g"+(i+1); if(d && d.pass && !g.done[k]) g.done[k] = {d: today(), xp: 30, l: "Dilbilgisi Ünite "+(i+1), auto: 1}; }); }
 function gameClick(e, redraw){
   const t = e.target.closest("[data-gtick]"); if(t){ e.preventDefault(); const g = game(), k = t.dataset.gtick;
     if(g.done[k]) delete g.done[k]; else { g.done[k] = {d: today(), xp: +t.dataset.xp, l: t.dataset.l}; toast(`+${t.dataset.xp} XP ✨`); }
     lvCheck(); save(); redraw(); return true; }
   return false;
 }
-function lvCheck(){ const g = game(), n = gLevel(gXP()); for(let i=0;i<=n;i++) if(!g.lvd[i]) { g.lvd[i] = today(); if(i>0){ g.newLv = i; } } }
+function lvCheck(){ syncGram(); const g = game(), n = gLevel(gXP()); for(let i=0;i<=n;i++) if(!g.lvd[i]) { g.lvd[i] = today(); if(i>0){ g.newLv = i; } } }
 function itemRow(x){ const dn = game().done[x.k]; return `<div class="lrow" style="align-items:center"><button class="tick ${dn?"on":""}" data-gtick="${x.k}" data-xp="${x.xp}" data-l="${esc(x.l)}" aria-label="Tamamlandı işaretle" style="flex:none">${ICON.check}</button>
-  <span style="flex:1;min-width:0" class="small">${x.href?`<a href="${x.href}" style="color:inherit">${esc(x.l)}</a>`:esc(x.l)}${x.sup?` <span class="tag">takviye</span>`:""}</span><span class="tiny">+${x.xp}</span></div>`; }
+  <span style="flex:1;min-width:0" class="small">${x.href?`<a href="${x.href}" style="color:inherit">${esc(x.l)}</a>`:esc(x.l)}${x.sup?` <span class="tag">takviye</span>`:""}${(x.links||[]).length?`<span class="row" style="gap:4px;margin-top:4px">${x.links.map(([t,h])=>{ const b = ((S.game||{}).rd||{})[h.split("/").pop()]; return `<a class="chip" href="${h}" style="text-decoration:none">${esc(t)}${b&&b.of?" ✓":""}</a>`; }).join("")}</span>`:""}</span><span class="tiny">+${x.xp}</span></div>`; }
 function gameHead(){ const x = gXP(), i = gLevel(x), nx = GLV[i+1], g = game(), st = GSTAGES[g.stage-1], ln = lane();
   const pct = nx ? Math.round(100*(x-GLV[i][1])/(nx[1]-GLV[i][1])) : 100;
   return `<div class="between"><div><div class="tiny">AŞAMA ${g.stage} · ${esc(st.n.toUpperCase())} · ${st.lv}</div><h3 style="margin:2px 0 0">🎮 Seviye ${i+1} · ${GLV[i][0]}</h3></div><span class="tag acc">${x.toLocaleString("tr-TR")} XP</span></div>
@@ -1837,7 +1890,7 @@ function vGame(m, sub){
   const wk = addDays(today(), -((new Date(today()+"T12:00:00").getDay()+6)%7)), rv = (g.rev||{})[wk] || {};
   const pk = S.pack && S.pack.game;
   g.newLv = 0; save();
-  m.innerHTML = guideSeg("oyun") + `<h1>İlerleme Oyunu</h1><p class="sub">Kolay bir zaferle başla, %85 bölgesinde ilerle, seviye seviye Proficiency'ye çık. Kâğıttaki oyunun aynısı; XP'yi uygulama sayar.</p>
+  m.innerHTML = guideSeg("oyun") + `<h1>İlerleme Oyunu</h1><p class="sub">Kolay bir zaferle başla, %85 bölgesinde ilerle, seviye seviye Proficiency'ye çık. XP'yi uygulama sayar; her şey burada.</p>
   <div class="card">${gameHead()}<div class="road" style="margin-top:12px">${[1,2,3,4].map(s=>`<div class="${s===g.stage?"cur":""}"><div class="bar"><i style="width:${s<g.stage?100:s===g.stage?Math.round(100*(g.week-1)/GSTAGES[s-1].weeks.length):0}%"></i></div><b>${s}</b><span>${esc(GSTAGES[s-1].n)}</span></div>`).join("")}</div></div>
   <div class="card" style="border-left:4px solid ${LANEC[lane().c]}"><b>Şeridin: ${lane().n}</b><p class="small" style="margin:6px 0 0">${lane().tip}</p><p class="tiny" style="margin:6px 0 0">Kural: hep %80–85 doğru bölgesinde kal. Daha fazlası sıkar, daha azı yorar. Şerit son 3 gramer alıştırmana göre hesaplanır.</p></div>
   <h2>Hafta ${g.week} · ${esc(st.n)}</h2>
@@ -1869,7 +1922,7 @@ function vGame(m, sub){
    <div class="row"><button class="btn sm" data-rvsave>Kaydet</button><button class="btn ghost sm" data-gcoach>Claude'dan haftalık koçluk al</button></div></div>
   <details class="card"><summary class="small"><b>XP nasıl kazanılır?</b></summary><div class="small" style="margin-top:8px;line-height:1.7">
    Otomatik: uygulamada günlük çalışma (kelime + ders) 5 · uygulamadaki dersi %85+ geçmek 10 · başlangıç hediyesi 50<br>
-   İşaretleyerek: Dilbilgisi Kitabı ünitesi 30 · Okuma Kitabı metni 25 · takviye okuma 25 · Kelime Kitabı bir gün 15 · haftalık test/hikâye 30 · kurs günü 40 · kurs dinleme 20<br>
+   Dilbilgisi ünitesi 30 (dersi geçince kendiliğinden) · işaretleyerek: okuma metni 25 · takviye okuma 25 · telaffuz ünitesi 15 · kurs kelimeleri haftası 75 + test 30 · kurs günü 40 · kurs dinleme 20<br>
    Diğer: ses kaydı 10 · 5 hata 10 · zarf 40 · boss 150 (denemek 50) · zar görevi 15–20</div></details>
   <details class="card"><summary class="small"><b>Açık kartlar: seni nasıl "kandırıyorum"?</b></summary><ol class="small" style="margin:8px 0 0;padding-left:20px;line-height:1.6">
    <li>Kolay bir zaferle başlatıyorum: ustalık deneyimi özgüveni en çok besleyen şey (Bandura).</li><li>Seni %85 bölgesinde tutuyorum: öğrenme en hızlı orada (Wilson ve ark. 2019).</li><li>50 XP hediye ile başlatıyorum: kazanılmış ilerleme etkisi (Nunes & Drèze 2006).</li><li>Hedefe yaklaştıkça seviyeler kısalıyor: hedef eğimi etkisi (Kivetz ve ark. 2006).</li><li>Kapalı zarflar merakını kullanıyor: bilgi boşluğu (Loewenstein 1994).</li><li>Günü keyifli bitiriyorum: zirve-son kuralı (Kahneman ve ark. 1993).</li><li>İlerlemeni görünür yapıyorum: ilerleme ilkesi (Amabile & Kramer 2011).</li><li>Seçim hakkı veriyorum: zar, joker, şerit (Deci & Ryan).</li><li>Hataya puan veriyorum: hata bilgidir.</li></ol><p class="tiny">Bilmen etkilerini azaltmaz; işe yaramalarının nedeni beynin nasıl çalıştığı.</p></details>`;
@@ -2296,7 +2349,7 @@ function vCards(m, sub){
        <div class="small muted">${pStarted} kart başladı, ${pKnown} tanesi oturdu. Eş anlamlılar gruplar halinde gelir: kartın ön yüzünde her seferinde gruptan farklı bir kelime çıkar, arkasında hepsi yazar.</div>
        <div class="between"><span class="small">Günde yeni sınav kartı</span><div class="row">${[0,3,5,8,12].map(n=>`<button class="chip" data-pp="${n}" aria-pressed="${(S.settings.packPerDay??5)===n}">${n}</button>`).join("")}</div></div>
        <a class="btn" href="#kelime/es">Eş anlamlı testi (10 soru)</a>
-       ${pk.game ? "" : `<div class="card soft small" style="margin:0">🆕 Paketin yeni sürümünde İlerleme Oyunu'nun takviye kitap planı var. Aynı dosyayı bir kez daha seç; kartlardaki ilerlemen korunur. <label class="btn sm" style="margin-top:6px">Paketi güncelle<input type="file" accept="application/json,.json" data-pack hidden></label></div>`}</div>`
+       ${pk.reads ? "" : `<div class="card soft small" style="margin:0">🆕 Paketin yeni sürümünde Okuma Kitabı'nın 26 metni, takviye kitap planı ve telaffuz programı var. Aynı dosyayı bir kez daha seç; kartlardaki ilerlemen korunur. <label class="btn sm" style="margin-top:6px">Paketi güncelle<input type="file" accept="application/json,.json" data-pack hidden></label></div>`}</div>`
      : `<div class="card stack"><h3 style="margin:0">🎓 Kurs paketi yükle</h3><p class="small muted" style="margin:0">Test Atölyesi kelime listesini (1.100+ eş anlamlı kelime ve 91 phrasal verb) senin için hazırladım. Bilgisayarda düğmeye bas ve şu dosyayı seç: <b>Masaüstü › claude ile hayatı kolaylaştır › ingilizce-paket › test-atolyesi-kelime.json</b>. Bir kez yüklemen yeter; Drive eşitlemesi açıksa telefonuna da kendiliğinden geçer. Paket sadece sende kalır, sitede yayınlanmaz.</p>
        <label class="btn">Paket dosyasını seç<input type="file" accept="application/json,.json" data-pack hidden></label></div>`;
     const finished = CS && CS.total;
