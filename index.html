@@ -788,7 +788,7 @@ function mergeState(L, R){
   M.custom = byKey([...(L.custom||[]), ...(R.custom||[])], c=>c.id);
   for(const [d,v] of Object.entries(R.newOn||{})) M.newOn[d] = Math.max(M.newOn[d]||0, v);
   for(const [d,v] of Object.entries(R.done||{})){ const o = M.done[d]||{}; const n = {};
-    new Set([...Object.keys(o), ...Object.keys(v)]).forEach(k=>{ const a = o[k], b = v[k]; n[k] = typeof a==="boolean" || typeof b==="boolean" ? !!(a||b) : (a!=null ? a : b); });
+    new Set([...Object.keys(o), ...Object.keys(v)]).forEach(k=>{ const a = o[k], b = v[k]; n[k] = typeof a==="boolean" || typeof b==="boolean" ? !!(a||b) : a && b && typeof a==="object" && typeof b==="object" ? Object.assign({}, b, a) : (a!=null ? a : b); });
     M.done[d] = n; }
   if(R.gr){ M.gr = M.gr || {done:{}}; for(const [id,b] of Object.entries(R.gr.done||{})){ const a = M.gr.done[id];
     if(!a || (b.date||"") > (a.date||"") || ((b.date||"")===(a.date||"") && (b.best||0)>(a.best||0))) M.gr.done[id] = Object.assign({}, b, {pass: !!(b.pass || (a&&a.pass)), best: Math.max(b.best||0, (a&&a.best)||0)});
@@ -798,6 +798,8 @@ function mergeState(L, R){
   if(R.log){ M.log = M.log || {}; for(const [d,o] of Object.entries(R.log)){ const a = M.log[d] || {}; Object.keys(o).forEach(k=>a[k] = Math.max(a[k]||0, o[k]||0)); M.log[d] = a; } }
   if(newer===R && R.goals) M.goals = R.goals;
   M.miles = Object.assign({}, R.miles||{}, L.miles||{});
+  if(R.media){ M.media = M.media || {}; ["ser","lis"].forEach(s=>{ const a = M.media[s] = M.media[s] || {}; Object.entries(R.media[s]||{}).forEach(([k,v])=>a[k] = Math.max(a[k]||0, v)); }); }
+  if(R.readDone) M.readDone = Object.assign({}, R.readDone, M.readDone||{});
   M.grammarDone = [...new Set([...(L.grammarDone||[]), ...(R.grammarDone||[])])];
   M.journal = byKey([...(R.journal||[]), ...(L.journal||[])], j=>j.id).sort((a,b)=>a.id-b.id);
   if(R.wr){
@@ -1214,9 +1216,82 @@ function flowOn(){ try{ return sessionStorage.getItem("flow")===today(); }catch(
 function setFlow(v){ try{ v ? sessionStorage.setItem("flow", today()) : sessionStorage.removeItem("flow"); }catch(e){} }
 function fd(){ const t = today(); S.done[t] = S.done[t] || {}; return S.done[t]; }
 
-/* ---------- today's guided lesson: words → grammar → sentences ---------- */
+/* Gramer+ data: extra exercises per lesson (fix / tr / tf) and exam-tip corners for B1+ lessons */
+const GX = {"X":{"a1-be":[["fix","My sister a nurse.","My sister is a nurse."],["fix","They is in the workshop.","They are in the workshop."],["tr","Bugün yorgun değilim.","I am not tired today. / I'm not tired today."],["tr","Hocamız çok nazik.","Our teacher is very kind."]],"a1-ps":[["fix","My friend go to the studio every day.","My friend goes to the studio every day."],["fix","Do she like sketching?","Does she like sketching?"],["tr","Hafta sonları resim çizerim.","I draw at the weekend. / I draw on weekends."],["tr","Babam kahve içmez.","My father doesn't drink coffee."]],"a1-there":[["fix","There are a big table in the studio.","There is a big table in the studio."],["fix","Have a park near my house.","There is a park near my house."],["tr","Çantamda iki kalem var.","There are two pens in my bag."],["tr","Bu odada pencere yok.","There isn't a window in this room. / There is no window in this room."]],"a1-art":[["fix","My brother is engineer.","My brother is an engineer."],["fix","I saw a film yesterday. A film was great.","I saw a film yesterday. The film was great."],["tr","Bir elma ve bir muz istiyorum.","I want an apple and a banana."],["tr","Kapıyı kapatır mısın?","Can you close the door?"]],"a1-pl":[["fix","I have three sketchbook.","I have three sketchbooks."],["fix","Those car is very old.","That car is very old. / Those cars are very old."],["tr","Bu çocuklar benim kuzenlerim.","These children are my cousins."],["tr","Şu ayakkabılar çok rahat.","Those shoes are very comfortable."]],"a1-can":[["fix","I can to speak a little English.","I can speak a little English."],["fix","Do you can help me?","Can you help me?"],["tr","3D model yapabilirim ama kodlayamam.","I can make 3D models, but I can't code."],["tr","Burada fotoğraf çekebilir miyim?","Can I take photos here?"]],"a1-poss":[["fix","This is my friend laptop.","This is my friend's laptop."],["fix","She loves his job. (kadın kendi işini seviyor)","She loves her job."],["tr","Onların dairesi küçük ama güzel.","Their flat is small but nice."],["tr","Annemin adı Ayşe.","My mother's name is Ayşe."]],"a1-q":[["fix","Where you live?","Where do you live?"],["fix","What time the class starts?","What time does the class start?"],["tr","Hangi programı kullanıyorsun?","Which program do you use?"],["tr","Okula nasıl gidiyorsun?","How do you go to school? / How do you get to school?"]],"a2-past":[["fix","I goed to the museum yesterday.","I went to the museum yesterday."],["fix","Did you saw the exhibition?","Did you see the exhibition?"],["tr","Geçen hafta yeni bir sandalye tasarladım.","I designed a new chair last week."],["tr","Dün akşam dışarı çıkmadık.","We didn't go out last night."]],"a2-pc":[["fix","I am work on my project now.","I am working on my project now."],["fix","She is knowing the answer.","She knows the answer."],["tr","Şu an bir maket yapıyorum.","I am making a model right now."],["tr","Ne izliyorsun?","What are you watching?"]],"a2-comp":[["fix","This chair is more comfortable than that one is more.","This chair is more comfortable than that one."],["fix","My laptop is more fast than yours.","My laptop is faster than yours."],["tr","İstanbul Ankara'dan daha kalabalık.","Istanbul is more crowded than Ankara."],["tr","Bu, sınıftaki en iyi tasarım.","This is the best design in the class."]],"a2-fut":[["fix","I will to visit my aunt.","I will visit my aunt. / I am going to visit my aunt."],["fix","Look at those clouds! It will rain. (kanıt var)","Look at those clouds! It's going to rain."],["tr","Yazın Berlin'de staj yapacağım. (plan)","I'm going to do an internship in Berlin this summer."],["tr","Merak etme, sana yardım ederim. (anlık karar)","Don't worry, I'll help you."]],"a2-pp":[["fix","I have saw this film.","I have seen this film."],["fix","Have you ever went to Italy?","Have you ever been to Italy?"],["tr","Projemi henüz bitirmedim.","I haven't finished my project yet."],["tr","Hiç sushi yedin mi?","Have you ever eaten sushi?"]],"a2-count":[["fix","I don't have many money.","I don't have much money."],["fix","Can I have an advice?","Can I have some advice? / Can I have a piece of advice?"],["tr","Buzdolabında hiç süt var mı?","Is there any milk in the fridge?"],["tr","Bu dönem çok ödevimiz var.","We have a lot of homework this term."]],"a2-prep":[["fix","The class is in Monday.","The class is on Monday."],["fix","I'll see you on 5 o'clock.","I'll see you at 5 o'clock."],["tr","Temmuzda doğdum.","I was born in July."],["tr","Gece genellikle evdeyim.","I'm usually at home at night."]],"a2-freq":[["fix","I go always to the gym.","I always go to the gym."],["fix","She is late never.","She is never late."],["tr","Bazen kahvaltıyı atlarım.","I sometimes skip breakfast."],["tr","Hafta sonları genellikle geç uyanırım.","I usually wake up late at the weekend."]],"b1-ppps":[["fix","I have visited Paris in 2023.","I visited Paris in 2023."],["fix","I know her since 2020.","I have known her since 2020."],["tr","Bu tasarımı üç kez değiştirdim. (şimdiye kadar)","I have changed this design three times."],["tr","Dün hocamla konuştum.","I talked to my teacher yesterday. / I spoke to my teacher yesterday."]],"b1-pastc":[["fix","I was draw when the lights went out.","I was drawing when the lights went out."],["fix","While I walked home, it was starting to rain.","While I was walking home, it started to rain."],["tr","Sen aradığında duş alıyordum.","I was having a shower when you called."],["tr","Dün saat sekizde ne yapıyordun?","What were you doing at eight o'clock yesterday?"]],"b1-cond":[["fix","If I will have time, I'll call you.","If I have time, I'll call you."],["fix","If I would be rich, I would travel.","If I were rich, I would travel."],["tr","Erken kalkarsan otobüsü yakalarsın.","If you get up early, you'll catch the bus."],["tr","Yerinde olsam o teklifi kabul ederdim.","If I were you, I would accept that offer."]],"b1-pass":[["fix","The chair designed in 1950.","The chair was designed in 1950."],["fix","English is speak all over the world.","English is spoken all over the world."],["tr","Bu lambalar İtalya'da üretiliyor.","These lamps are made in Italy. / These lamps are produced in Italy."],["tr","Sergi dün açıldı.","The exhibition was opened yesterday."]],"b1-used":[["fix","I use to play the piano.","I used to play the piano."],["fix","I'm used to wake up early.","I'm used to waking up early."],["tr","Çocukken çok çizgi film izlerdim.","I used to watch a lot of cartoons when I was a child."],["tr","Yurtta yaşamaya alıştım.","I'm used to living in a dorm. / I've got used to living in a dorm."]],"b1-rep":[["fix","She said me that she was tired.","She told me that she was tired. / She said that she was tired."],["fix","He asked where did I live.","He asked where I lived."],["tr","Hocam projemin iyi olduğunu söyledi.","My teacher said (that) my project was good."],["tr","Bana yardıma ihtiyacım olup olmadığını sordu.","She asked me if I needed help. / He asked me whether I needed help."]],"b1-rel":[["fix","The man which lives next door is a chef.","The man who lives next door is a chef."],["fix","This is the café where we met there.","This is the café where we met."],["tr","Dün aldığım kitap çok ilginç.","The book (that) I bought yesterday is very interesting."],["tr","Bu sandalyeyi tasarlayan kadın Danimarkalı.","The woman who designed this chair is Danish."]],"b1-modal":[["fix","You must to wear a helmet.","You must wear a helmet."],["fix","She have to work on Saturday.","She has to work on Saturday."],["tr","Daha çok su içmelisin.","You should drink more water."],["tr","Yarın erken kalkmak zorunda değilim.","I don't have to get up early tomorrow."]],"b2-tense":[["fix","When we arrived, the lecture already finished.","When we arrived, the lecture had already finished."],["fix","I study English for two years.","I have been studying English for two years."],["tr","Haziran ayına kadar portfolyomu bitirmiş olacağım.","I will have finished my portfolio by June."],["tr","Gözleri kırmızıydı çünkü saatlerdir ekrana bakıyordu.","Her eyes were red because she had been looking at the screen for hours."]],"b2-pass":[["fix","The results will announce next week.","The results will be announced next week."],["fix","The building is being build now.","The building is being built now."],["tf","Edilgen yap: People say that the bridge is unsafe. → It ...","It is said that the bridge is unsafe."],["tf","Edilgen yap: They have cancelled the meeting. → The meeting ...","The meeting has been cancelled."]],"b2-rel":[["fix","The designer who his lamp won the prize is from Japan.","The designer whose lamp won the prize is from Japan."],["fix","This is the city in where I was born.","This is the city in which I was born. / This is the city where I was born."],["tr","Babası mimar olan arkadaşım bana yardım etti.","My friend whose father is an architect helped me."],["tf","Birleştir: The studio is very bright. I work in it. → The studio in which ...","The studio in which I work is very bright."]],"b2-red":[["fix","The students attended the workshop got a certificate.","The students attending the workshop got a certificate. / The students who attended the workshop got a certificate."],["fix","The chairs making of bamboo are light.","The chairs made of bamboo are light."],["tf","Kısalt: The woman who is sitting by the window is my tutor.","The woman sitting by the window is my tutor."],["tf","Kısalt: The report which was written by our team was accepted.","The report written by our team was accepted."]],"b2-caus":[["fix","I had my laptop repair yesterday.","I had my laptop repaired yesterday."],["fix","My parents didn't let me to go.","My parents didn't let me go."],["tr","Saçımı kestirmem lazım.","I need to have my hair cut. / I need to get my hair cut."],["tr","Hocamız bize projeyi üç kez yeniden yaptırdı.","Our teacher made us redo the project three times."]],"b2-conj":[["fix","Despite it was raining, we went out.","Although it was raining, we went out. / Despite the rain, we went out."],["fix","Because of she was ill, she missed the exam.","Because she was ill, she missed the exam. / Because of her illness, she missed the exam."],["tf","Despite ile yeniden yaz: Although the model was expensive, I bought it.","Despite the model being expensive, I bought it. / Despite the fact that the model was expensive, I bought it."],["tf","Due to ile yeniden yaz: The flight was delayed because the weather was bad.","The flight was delayed due to the bad weather."]],"b2-trans":[["fix","I studied hard, however I failed.","I studied hard. However, I failed. / I studied hard; however, I failed."],["fix","The plan is cheap. Therefore it is risky.","The plan is cheap. However, it is risky."],["tr","Bu malzeme hafif. Üstelik geri dönüştürülebilir.","This material is light. Moreover, it is recyclable. / In addition, it can be recycled."],["tr","Otobüsü kaçırdım. Bu yüzden derse geç kaldım.","I missed the bus. Therefore, I was late for class."]],"b2-noun":[["fix","I don't know where does she live.","I don't know where she lives."],["fix","What he said it was true.","What he said was true."],["tf","Birleştir: Will he come? I'm not sure. → I'm not sure ...","I'm not sure whether he will come. / I'm not sure if he will come."],["tr","Ne istediğini anlamadım.","I didn't understand what you wanted."]],"b2-if":[["fix","If I would have known, I would have come.","If I had known, I would have come."],["fix","I wish I have more time.","I wish I had more time."],["tr","Keşke o otobüse binmeseydim.","I wish I hadn't taken that bus."],["tf","Karışık if: I didn't sleep last night, so I'm tired now. → If I had ...","If I had slept last night, I wouldn't be tired now."]],"b2-modal":[["fix","You should have came earlier.","You should have come earlier."],["fix","He must have be at home.","He must have been at home."],["tr","Anahtarlarımı otobüste düşürmüş olabilirim.","I might have dropped my keys on the bus. / I may have dropped my keys on the bus."],["tf","Restatement: It was a mistake not to save the file. → You should ...","You should have saved the file."]],"b2-ger":[["fix","I'm looking forward to see you.","I'm looking forward to seeing you."],["fix","She decided studying abroad.","She decided to study abroad."],["tr","Sigarayı bırakmayı denedi.","He tried to give up smoking. / She tried to quit smoking."],["tr","Yemek yapmaktan hoşlanırım.","I enjoy cooking. / I like cooking."]],"b2-comp":[["fix","The more you practise, the more better you get.","The more you practise, the better you get."],["fix","My room is as big than yours.","My room is as big as yours."],["tr","Bu çanta onunki kadar pahalı değil.","This bag isn't as expensive as hers. / This bag is not as expensive as his."],["tf","Restatement: Ali is taller than all the students in his class. → Ali is the ...","Ali is the tallest student in his class."]],"c1-inv":[["fix","Seldom I have seen such patience.","Seldom have I seen such patience."],["fix","Only then I realised my mistake.","Only then did I realise my mistake."],["tf","Inversion ile yaz: I had just sat down when the phone rang. → Hardly ...","Hardly had I sat down when the phone rang."],["tf","Inversion ile yaz: She is talented and she is also hard-working. → Not only ...","Not only is she talented, but she is also hard-working."]],"c1-cleft":[["fix","What I need it is a long holiday.","What I need is a long holiday."],["fix","It was my sister who she called you.","It was my sister who called you."],["tf","Vurgula: I love the colour of this lamp. → What I love ...","What I love about this lamp is its colour. / What I love is the colour of this lamp."],["tf","Vurgula: Ece found the mistake. → It was ...","It was Ece who found the mistake."]],"c1-link":[["fix","Provided that you will finish early, you can leave.","Provided that you finish early, you can leave."],["fix","I study at night so as to not lose time.","I study at night so as not to lose time."],["tr","Ablam sabahları çalışır, oysa ben geceleri çalışırım.","My sister works in the mornings, whereas I work at night."],["tf","In case ile yaz: Take an umbrella because it might rain.","Take an umbrella in case it rains."]],"c1-pp":[["fix","Having finish the report, she went home.","Having finished the report, she went home."],["fix","Not know the way, we asked a local.","Not knowing the way, we asked a local."],["tf","Kısalt: After I had read the brief, I started sketching. → Having ...","Having read the brief, I started sketching."],["tf","Kısalt: Because she didn't want to be late, she took a taxi. → Not ...","Not wanting to be late, she took a taxi."]]},"E":{"b1-pass":[["Restatement ipucu","Sınavda aktif bir cümlenin karşılığı sık sık edilgen olarak verilir. Zamanı ve anlamı korursan doğru şıkkı bulursun.",["They are building a new library. = A new library is being built."]]],"b1-rel":[["Okumada kısa yol","Uzun bir cümlede who / which / that gördüğünde parantez aç: cümlenin asıl öznesi ve fiili parantezin dışındadır.",["The model [which my team built in two weeks] won the prize. → Asıl cümle: The model won the prize."]]],"b2-tense":[["İpucu kelime tablosu","Boşluk doldurmada önce zaman ifadesini bul, sonra tense'i seç.",["by the time + past → had V3","by the time + present → will have V3","for / since + hâlâ sürüyor → have been V-ing","so far / up to now / until now → have V3"]],["Restatement","Zaman kaydırmalarına dikkat: \"Bu, ilk kez...\" kalıbı Present Perfect ile eşleşir.",["It's the first time I've flown alone. = I have never flown alone before."]]],"b2-pass":[["Raporlayan edilgen","Akademik metinlerde \"söylenir, düşünülür, inanılır\" için iki kalıp vardır; ikisi de aynı anlamı taşır.",["It is believed that the city was founded in 300 BC.","The city is believed to have been founded in 300 BC."]],["Geçişsiz fiil tuzağı","happen, occur, arrive, die, disappear gibi nesne almayan fiiller edilgen olmaz. Şıklarda \"was happened\" görürsen ele.",["The accident happened at night. (was happened değil)"]]],"b2-rel":[["Edat + which / whom","Resmi dilde edat which / whom'un önüne geçer; that ile bu yapılmaz.",["the topic about which we talked","the people with whom I work"]],["Virgüllü relative","Virgülden sonra that kullanılmaz; bütün bir cümleye atıf için \", which\" gelir.",["She passed the exam, which surprised everyone."]]],"b2-red":[["Kısaltma ön şartı","Sadece who / which / that hemen ardından fiil geliyorsa kısaltabilirsin: aktif → V-ing, edilgen → V3.",["people who live here → people living here","a bag which was made by hand → a bag made by hand"]],["Okuma stratejisi","Cümle başındaki V-ing / V3 grubunu gördüğünde \"kim?\" diye sor: cevap virgülden sonraki öznedir.",["Designed in Milan, the chair became famous. → Sandalye Milano'da tasarlandı."]]],"b2-caus":[["Kalıp özeti","Kişiye yaptırma: make / let / have + kişi + V1 · get + kişi + to V1. Nesneye yaptırma: have / get + nesne + V3.",["I got my friend to check my CV.","I had my CV checked."]],["Edilgende make","make edilgen olunca to geri gelir.",["They made us wait. → We were made to wait."]]],"b2-conj":[["Bağlaç mı, edat mı?","Sınavın en klasik sorusu: boşluktan sonra cümle mi (özne + fiil) yoksa isim grubu mu var? Önce buna bak.",["Cümle alır: because, as, since, although, even though, while, whereas","İsim alır: because of, due to, owing to, despite, in spite of, thanks to","\"the fact that\" eklersen isim alanlar da cümle alır: despite the fact that ..."]],["Anlam ilişkisi","Şıklarda üç bağlaç aynı gramer yapısındaysa cümleler arasındaki ilişkiye bak: neden-sonuç mu, zıtlık mı, amaç mı?",["neden: because, since, as, now that, given that","zıtlık: although, even though, whereas, while","amaç: so that, in order to, so as to"]]],"b2-trans":[["Paragraf tamamlama","Boş cümleden sonraki cümle However ile başlıyorsa, boşluk ona zıt bir fikir içermelidir. Therefore ile başlıyorsa, boşluk onun nedenidir.",["... (boşluk) ... However, the costs were too high. → Boşlukta olumlu bir fikir aranır."]],["Noktalama","however / therefore / moreover iki ayrı cümle arasında kullanılır: nokta veya noktalı virgülden sonra gelir, ardından virgül alır.",["The idea was good; however, nobody funded it."]]],"b2-noun":[["Soru düzeni yok","Noun clause içinde soru kelimesinden sonra düz cümle düzeni gelir.",["Do you know where the library is? (where is the library değil)"]],["whether / if","\"-ip -mediği\" anlamında ikisi de olur; ama edattan sonra ve cümle başında yalnızca whether kullanılır.",["Whether we win or not doesn't matter.","It depends on whether they agree."]]],"b2-if":[["Restatement eşleşmeleri","Gerçek durumun tersini anlatan if cümlesinin karşılığı genellikle because / so ile kurulan gerçek cümledir.",["If I had studied, I would have passed. = I didn't study, so I failed.","I wish I had listened. = I regret not listening."]],["if yerine geçenler","unless (= if not), provided that, as long as, otherwise sık çıkar.",["You won't pass unless you practise. = If you don't practise, you won't pass."]]],"b2-modal":[["Anlam haritası","Geçmişe dair tahmin ve pişmanlık restatement sorularının favorisidir.",["must have V3 → kesin gibi tahmin (\"I'm sure he ...\")","can't have V3 → imkânsız (\"I'm sure he didn't ...\")","may / might / could have V3 → belki (\"Perhaps / It's possible that ...\")","should have V3 → yapmalıydın ama yapmadın (\"It was a mistake not to ...\")","needn't have V3 → yaptın ama gerek yoktu"]]],"b2-ger":[["Anlamı değişen fiiller","Bazı fiiller iki yapıyı da alır ama anlam değişir.",["stop smoking (sigarayı bıraktı) · stop to smoke (sigara içmek için durdu)","remember locking (kilitlediğini hatırlıyor) · remember to lock (kilitlemeyi unutma)","try doing (deneme olarak yap) · try to do (yapmaya çalış)"]],["to + V-ing","to bazen edattır, ardından V-ing gelir.",["look forward to, be used to, object to, when it comes to, devoted to"]]],"b2-comp":[["Kalıplar","Restatement'ta karşılaştırmalar sık sık yer değiştirir.",["not as ... as = less ... than","no other X is as ... as Y = Y is the most ...","the + comparative ..., the + comparative ..."]]],"c1-inv":[["Neden önemli?","Inversion okumada sık görülür. Restatement'ta düz cümlesini bulman beklenir.",["No sooner had the film started than the power went off. = As soon as the film started, the power went off.","Under no circumstances should you open this door. = You must never open this door."]]],"c1-cleft":[["Okumada vurgu","It is / was ... that kalıbı yazarın neyi önemsediğini gösterir; ana fikir sorularında işine yarar.",["It was not the price but the design that attracted buyers. → Vurgu: tasarım."]]],"c1-link":[["Koşul bağlaçları","provided / providing (that), as long as, on condition that → \"... şartıyla\"; in case → \"... ihtimaline karşı\" (if ile aynı değil).",["Take a jacket in case it gets cold. (soğursa diye, önceden)"]],["Zıtlık","whereas / while iki şeyi karşılaştırır; although bir beklentiyi bozar.",["Mert likes minimal design, whereas I prefer colour."]]],"c1-pp":[["Zaman sırası","Having V3 ile başlayan grup, ana cümleden önce olan bir olayı anlatır; özne iki tarafta da aynıdır.",["Having lived abroad, she understands culture shock."]],["Asılı ortaç hatası","Öznesi farklıysa kısaltma yanlış olur.",["Walking to class, the rain started. ✗ → While I was walking to class, the rain started. ✓"]]]}};
+/* ---------- today's plan ----------
+   Built from the time you have. Every step says exactly what to do, where, which episode / page, and how long,
+   and every step can be ticked by hand. Books are optional: without them every step stays inside the app. */
+const SFLAG = {cards:"cards", gram:"gram", write:"ladder"};
+function stepGet(k){ const d = fd(), f = SFLAG[k]; return f ? !!d[f] : !!(d.st||{})[k]; }
+function booksOn(){ const d = fd(); return d.books!=null ? !!d.books : !!S.settings.books; }
+function media(){ S.media = S.media || {}; S.media.ser = S.media.ser || {}; S.media.lis = S.media.lis || {}; return S.media; }
+const yt = q => "https://www.youtube.com/results?search_query=" + encodeURIComponent(q);
+// Series in order of difficulty. The app remembers which episode is next.
+const SERIES = [
+  {id:"extra", n:"Extr@ English", eps:30, where:"YouTube'da ücretsiz", q:n=>`Extra English episode ${n}`,
+   how:["İngilizce öğrenenler için çekilmiş komik bir dizi; yavaş ve net konuşuyorlar.","<b>İngilizce altyazıyı</b> aç (Türkçe değil). Anlamadığın yerde durmak serbest.","Bitince hoşuna giden 2 cümleyi Kelime › Ekle'ye yaz ve sesli tekrar et."]},
+  {id:"friends", n:"Friends · 1. sezon", eps:24, where:"Netflix ya da HBO Max", q:n=>`Friends season 1 episode ${n}`,
+   how:["<b>İngilizce altyazıyla</b> izle. Bir bölüm yaklaşık 22 dakika.","Bir sahneyi geri sar ve karakterle birlikte söyle (gölge okuma).","Bitince 2 cümleyi Kelime › Ekle'ye yaz."]},
+  {id:"abstract", n:"Abstract: The Art of Design", eps:14, half:true, where:"Netflix", q:n=>`Abstract The Art of Design episode ${n}`,
+   how:["Tasarımcıları anlatan bir belgesel: senin alanın. Bir bölüm ~45 dk, bugün yarısını izle.","<b>İngilizce altyazıyla</b> izle; tasarım terimlerini (prototype, sketch, material…) yakala.","Bitince tasarımcının fikrini İngilizce tek cümleyle yaz."]}
+];
+const LISTENS = [
+  {id:"voa1", n:"VOA Let's Learn English · Seviye 1", eps:52, where:"YouTube ya da learningenglish.voanews.com", q:n=>`VOA Let's Learn English Level 1 Lesson ${n}`},
+  {id:"voa2", n:"VOA Let's Learn English · Seviye 2", eps:30, where:"YouTube ya da learningenglish.voanews.com", q:n=>`VOA Let's Learn English Level 2 Lesson ${n}`},
+  {id:"6min", n:"BBC Learning English · 6 Minute English", eps:0, where:"BBC Learning English sitesi, YouTube ya da podcast uygulaman", q:()=>"BBC Learning English 6 Minute English"}
+];
+function mediaPick(list, store, startAt){
+  // start at the listening level, then move on when a series is finished
+  let i = Math.min(list.length-1, Math.max(0, startAt));
+  while(i < list.length-1 && list[i].eps && (store[list[i].id]||0) >= list[i].eps*(list[i].half?2:1)) i++;
+  return list[i];
+}
+function seriesNow(){ const d = fd(), m = media(), lv = lvOf("listening");
+  if(d.st && d.st.series && d.st.series.id){ const s = SERIES.find(x=>x.id===d.st.series.id); if(s) return {s, c: d.st.series.c}; }
+  const s = mediaPick(SERIES, m.ser, lv<=0 ? 0 : lv===1 ? 1 : 2); return {s, c: (m.ser[s.id]||0) + 1}; }
+function listenNow(){ const d = fd(), m = media(), lv = lvOf("listening");
+  if(d.st && d.st.listen && d.st.listen.id){ const s = LISTENS.find(x=>x.id===d.st.listen.id); if(s) return {s, c: d.st.listen.c}; }
+  const s = mediaPick(LISTENS, m.lis, lv<=0 ? 0 : lv===1 ? 1 : 2); return {s, c: (m.lis[s.id]||0) + 1}; }
+const LVI = {A1:0, A2:1, B1:2, B2:3, C1:4};
+// Today's reading text: this week's book texts first, then the next unread one at your level. Fixed for the day.
+function readFor(slot){
+  const d = fd(); d.rid = d.rid || {}; if(d.rid[slot]!=null) return d.rid[slot];
+  const br = bookReads(), rd = game().rd || {}, used = Object.values(d.rid), w = Math.max(0, workOf("reading"));
+  let id = null;
+  if(br.length){
+    const g = game(), wk = weekItems(g.stage, g.week).find(x=>/-r$/.test(x.k));
+    const cand = [...((wk && wk.links)||[]).map(l=>l[1].split("/").pop()), ...br.filter(r=>!r.min && LVI[r.lv]===w).map(r=>r.id), ...br.filter(r=>LVI[r.lv]<w).map(r=>r.id), ...br.filter(r=>LVI[r.lv]<=w+1).map(r=>r.id)];
+    id = cand.find(x=>!(rd[x]&&rd[x].of) && !used.includes(x)) || cand.find(x=>!used.includes(x)) || null;
+  } else {
+    const i = READS.findIndex((r,j)=>!used.includes("s"+j) && LVI[r.lv]<=w+1 && !((S.readDone||{})["s"+j])); id = "s" + Math.max(0, i);
+  }
+  d.rid[slot] = id; saveLocal(); return id;
+}
+function readInfo(id){
+  if(id && id[0]==="s"){ const r = READS[+id.slice(1)] || READS[0]; return {t:r.t, lv:r.lv, href:"#pratik/oku/"+id, q:false}; }
+  const r = bookReads().find(x=>x.id===id); if(!r) return {t:"Pratik › Oku'dan bir metin", lv:"", href:"#pratik/oku", q:false};
+  return {t:`Metin ${r.n}: ${r.t}`, lv:r.lv, href:"#pratik/oku/"+r.id, q:true, min:r.min};
+}
+// This week's book / course tasks from the İlerleme Oyunu table, sorted into kinds
+function bookItems(){
+  const g = game(), d = fd(), its = weekItems(g.stage, g.week), mine = Object.values((d.rid||{}).bk || {});
+  const open = its.filter(x=>(!g.done[x.k] || g.done[x.k].d===today() && mine.includes(x.k)) && !/bitirdim/i.test(x.l));
+  const kind = x => /^Telaffuz/i.test(x.l) ? "pron" : /^Takviye kelime/i.test(x.l) ? "voc" : /^(Takviye okuma|Keyif)/i.test(x.l) || x.sup==="kurs" || /^Kurs (Gün|dinleme)/.test(x.l) ? "read" : "";
+  const pickK = k => { d.rid = d.rid || {}; d.rid.bk = d.rid.bk || {}; const have = d.rid.bk[k] && its.find(x=>x.k===d.rid.bk[k]);
+    if(have) return have; const x = open.find(y=>kind(y)===k && !Object.values(d.rid.bk).includes(y.k)); if(x){ d.rid.bk[k] = x.k; saveLocal(); } return x || null; };
+  return {read: pickK("read"), voc: pickK("voc"), pron: pickK("pron")};
+}
+function planOf(p){
+  if(p<=5) return [["cards",5]];
+  if(p<45) return [["cards",5],["gram",8],["write",5]];
+  if(p<60) return [["cards",8],["gram",10],["write",5],["read",12],["listen",10]];
+  if(p<90) return [["cards",8],["gram",10],["gramx",7],["write",5],["read",12],["listen",10],["speak",8]];
+  if(p<180) return [["cards",10,1],["gram",12,1],["gramx",8,1],["write",5,1],["brk1",5,0],["read",15,2],["listen",15,2],["speak",10,2],["chat",10,2]];
+  return [["cards",15,1],["gram",15,1],["gramx",10,1],["write",10,1],["brk1",10,0],["read",20,2],["read2",20,2],["listen",15,2],["brk2",10,0],["series",25,3],["speak",10,3],["chat",15,3],["fun",5,3]];
+}
+const BLK = {1:"Blok 1 · Temel: kelime ve gramer", 2:"Blok 2 · Girdi: okuma ve dinleme", 3:"Blok 3 · Çıktı ve keyif"};
 function todaySteps(){
-  const d = fd();
+  const d = fd(), p = pace(), B = booksOn() && p>=45, g = game();
   if(!d.gplan){
     const due = dueLessons(), nl = nextLesson();
     d.gplan = due.length>=2 || (!nl && due.length) ? "rev" : nl ? "new" : "none";
@@ -1226,35 +1301,85 @@ function todaySteps(){
   const L = lessonById(d.lesson);
   const nCards = dueCards().length + Math.min(newLeftToday(), newPool().length) + Math.min(packNewLeft(), packPool().length);
   const wl = d.gplan==="new" ? L : lessonById(lastPassed()||"") || L;
-  const steps = [
-    {k:"cards", n:"Kelime", ic:"🗂️", min:5, d: nCards ? `${nCards} kart: tekrarlar ve yeni kelimeler` : "Bugünlük kart kalmadı", href:"#kelime/akis", done: !!d.cards || !nCards},
-    {k:"gram", n:"Gramer", ic:"🧩", min:8, d: d.gplan==="rev" ? `Tekrar: ${dueLessons().length} eski ders (kalıcı olsun diye)` : L ? L.t : "Tüm dersler bitti, serbest tekrar", href: d.gplan==="rev" ? "#gramer/tekrar" : L ? "#gramer/"+L.id : "#gramer", done: !!d.gram || d.gplan==="none"},
-    {k:"write", n:"Cümle kur", ic:"✍️", min:5, d: wl ? `"${wl.t.split(":")[0]}" ile 3 basamakta 3 cümle` : "Kendi cümlelerin", href: wl ? "#cumle/"+wl.id : "#pratik/yaz", done: !!d.ladder}
-  ];
-  // 4th step: one task from this week's book table, only on days with 45+ minutes
-  if(typeof game==="function" && pace()>=45){
-    const g = game(), its = weekItems(g.stage, g.week), item = its.find(x=>!g.done[x.k]), bookToday = Object.values(g.done).some(e=>e.d===today());
-    if(item || bookToday) steps.push({k:"book", n:"Kitap", ic:"📕", min: pace()>=90 ? 25 : 15,
-      d: bookToday ? "Bugünkü kitap görevin tamam" : item.href ? `${item.l} · kitapta çöz, sonra ders sayfasının altındaki "Kitapta bitirdim"e dokun` : `${item.l} · bitirince Oyun sayfasında kutucuğu işaretle`, href: item && item.href ? item.href : "#oyun", done: bookToday || !!d.book});
-  }
+  const bi = B ? bookItems() : {}, tpl = planOf(p);
+  if(B && bi.voc && p>=180){ tpl[0] = ["cards",10,1]; tpl.splice(1, 0, ["voc",5,1]); }
+  const steps = [];
+  tpl.forEach(([k, min, blk])=>{
+    let s = null;
+    if(k==="cards") s = {n:"Kelime kartları", ic:"🗂️", d: nCards ? `${nCards} kart: tekrarlar ve yeni kelimeler` : "Bugünlük kart kalmadı", href:"#kelime/akis", done: !!d.cards || !nCards};
+    if(k==="gram") s = {n:"Gramer dersi", ic:"🧩", d: d.gplan==="rev" ? `Tekrar: ${dueLessons().length} eski ders (kalıcı olsun diye)` : L ? `Ünite ${LESSONS.indexOf(L)+1}: ${L.t}` : "Tüm dersler bitti, serbest tekrar", href: d.gplan==="rev" ? "#gramer/tekrar" : L ? "#gramer/"+L.id : "#gramer", done: !!d.gram || d.gplan==="none",
+      book: B && L && S.pack && S.pack.egiu && S.pack.egiu[LESSONS.indexOf(L)+1] ? "Kitapla pekiştirmek istersen: " + S.pack.egiu[LESSONS.indexOf(L)+1] : ""};
+    if(k==="gramx"){ const X = gxLesson(); s = {n:"Gramer+ ek alıştırma", ic:"🔧", d: X ? `"${X.t.split(":")[0]}": hatayı düzelt, Türkçeden çevir, dönüştür (${(GX.X[X.id]||[]).length} soru)` : "Bugünkü dersin ek alıştırmaları", href:"#gx", done: stepGet("gramx")};
+      if(X){ const li = LESSONS.indexOf(X), pv = li>0 && lessonPassed(LESSONS[li-1].id) && GX.X[LESSONS[li-1].id]; if(pv) s.d = `"${X.t.split(":")[0]}" + bir önceki ders: hatayı düzelt, çevir, dönüştür (${GX.X[X.id].length + pv.length} soru)`; } }
+    if(k==="write") s = {n:"Cümle kur", ic:"✍️", d: wl ? `"${wl.t.split(":")[0]}" ile 3 basamakta 3 cümle` : "Kendi cümlelerin", href: wl ? "#cumle/"+wl.id : "#pratik/yaz", done: !!d.ladder};
+    if(k==="voc"){ const x = bi.voc; s = {n:"Kitap: kelime ünitesi", ic:"📗", d: x.l, item:x, href:"#adim/voc", manual:1,
+      how:["Ünitenin sol sayfasını oku, yeni kelimeleri sesli söyle.","Sağ sayfadaki alıştırmaları kurşun kalemle yap.","3 kelimeyi Kelime › Ekle ile kartlarına ekle."]}; }
+    if(k==="read" || k==="read2"){
+      const x = (k==="read2" || p<180) && bi.read;
+      if(x) s = {n:"Kitap: okuma", ic:"📕", d: x.l, item:x, href:"#adim/"+k, manual:1,
+        how:["Önce başlığa ve resimlere bak: konu ne?","Bir kez durmadan oku; her kelimeyi anlaman gerekmiyor.","Sorular varsa çöz. Takıldığın en fazla 5 kelimeyi not al."],
+        alt:"Kitap yanında değilse: Bugün › 📕 Kitaplar sorusunu “Hayır” yap, bu adım uygulamadaki bir metne dönüşür."};
+      else { const rid = readFor(k), ri = readInfo(rid), rd = (g.rd||{})[rid];
+        s = {n: k==="read2" ? "İkinci okuma" : "Okuma", ic:"📖", d: `${ri.t}${ri.lv?" · "+ri.lv:""}${ri.q?" · sorularıyla":""}`, href: ri.href, rid, manual:1, at:[ri.href],
+          done: stepGet(k) || !!(rd && rd.of && rd.d===today())}; }
+    }
+    if(k==="listen"){ const {s:L2, c} = listenNow(), ep = L2.eps ? ` · Ders ${c}` : " · en yeni bölümlerden biri";
+      s = {n:"Dinleme", ic:"🎧", d: L2.n + ep, href:"#adim/listen", manual:1, media:["lis", L2.id, c],
+        how:["Önce <b>sadece dinle</b>, ekrana bakma: ne anladın? Türkçe tek cümle.","İkinci kez altyazıyla / metinle dinle.","3 cümleyi durdurup konuşmacıyla birlikte tekrar et."],
+        btns:[[`▶ ${L2.n}${L2.eps?" · Ders "+c:""} (YouTube'da aç)`, yt(L2.q(c)), 1]],
+        alt:`Nerede: ${L2.where}. İnternet yoksa: Pratik › Dinle'deki dikteyi yap (aynı yeri sayar).`, at:["#pratik/dinle"]}; }
+    if(k==="series"){ const {s:S2, c} = seriesNow(), ep = S2.half ? Math.ceil(c/2) : c, part = S2.half ? (c%2 ? " · ilk yarısı" : " · ikinci yarısı") : "";
+      s = {n:"Dizi", ic:"📺", d: `${S2.n} · ${ep}. bölüm${part}`, href:"#adim/series", manual:1, media:["ser", S2.id, c], how:S2.how,
+        btns:[[`▶ ${S2.n} ${ep}. bölüm (ara)`, yt(S2.q(ep)), 1]], alt:`Nerede: ${S2.where}. Dizi açılmıyorsa İngilizce altyazılı herhangi bir bölüm de olur; bitince “Bitti”ye dokun.`}; }
+    if(k==="speak"){ const x = bi.pron;
+      s = x ? {n:"Kitap: telaffuz", ic:"🗣️", d: x.l, item:x, href:"#adim/speak", manual:1, how:["Ünitedeki kaydı YouTube'da aç (kitap adı + ünite numarasıyla ara).","Kayıtla birlikte sesli tekrar et, sonra alıştırmaları yap.","Kendini 30 saniye kaydet: Oyun › Ses kaydı."]}
+            : {n:"Konuşma", ic:"🗣️", d:"Gölge okuma + 1 dakika konuşma (uygulamada, mikrofonla)", href:"#adim/speak", manual:1, at:["#pratik/konus"],
+               how:["Pratik › Konuş'u aç: cümleyi dinle, aynı anda sesli tekrar et (3 cümle).","Sonra verilen konu hakkında 1 dakika konuş. Hata serbest!","Bitince buraya dön, “Bitti”ye dokun."], btns:[["🎙️ Pratik › Konuş'u aç", "#pratik/konus"]]}; }
+    if(k==="chat") s = {n:"Claude ile sohbet", ic:"💬", d:"Seviyene göre ayarlı öğretmen sohbeti: 10–15 mesaj", href:"#adim/chat", manual:1, at:["#pratik/sohbet"],
+      how:["Pratik › Sohbet'te “Serbest sohbet”i seç, hazır metni Claude'a yapıştır.","Kısa cümlelerle yaz; Claude en fazla 2 hatanı düzeltir.","Bitirirken “bitti” yaz: sana kelime listesi verir. Yeni kelimeleri Kelime › Ekle'ye yapıştır."],
+      btns:[["💬 Pratik › Sohbet'i aç", "#pratik/sohbet"]]};
+    if(k==="brk1" || k==="brk2") s = {n:"Mola", ic:"☕", d:`${min} dakika ara: kalk, su iç, ekrandan uzaklaş`, href:"#adim/"+k, manual:1, brk:min};
+    if(k==="fun") s = {n:"Keyifli kapanış", ic:"🎲", d:"Zar at ya da hata defterine bugünkü 1 hatanı yaz", href:"#adim/fun", manual:1,
+      how:["Oyun sayfasında zar at: çıkan küçük görevi yap.","Ya da bugün yaptığın 1 hatayı Oyun › Hata defterine yaz (5 hata = +10 XP)."], btns:[["🎮 Oyunu aç", "#oyun"]]};
+    if(!s) return;
+    s.k = k; s.min = min; s.blk = blk || 0;
+    if(s.item && !s.done) s.done = stepGet(k) || !!(g.done[s.item.k] && g.done[s.item.k].d===today());
+    if(s.done==null) s.done = stepGet(k);
+    steps.push(s);
+  });
   return steps;
+}
+// Tick / untick a step by hand or when it finishes. Book steps also tick the game table (XP); media steps move to the next episode.
+function markStep(k, v){
+  const d = fd(), st = todaySteps(), s = st.find(x=>x.k===k), f = SFLAG[k], g = game();
+  if(f) d[f] = !!v;
+  else { d.st = d.st || {}; if(v){ d.st[k] = s && s.media && v===true ? {id:s.media[1], c:s.media[2]} : v; } else delete d.st[k]; }
+  if(s && s.media){ const [store, id, c] = s.media, m = media()[store]; if(v===true) m[id] = Math.max(m[id]||0, c); else if(!v && (m[id]||0)===c) m[id] = c-1; }
+  if(s && s.item){ const x = s.item; if(v===true && !g.done[x.k]){ g.done[x.k] = {d:today(), xp:x.xp, l:x.l}; toast(`+${x.xp} XP ✨`); lvCheck(); }
+    if(!v && g.done[x.k] && g.done[x.k].d===today()) delete g.done[x.k]; }
+  if(s && s.rid && s.rid[0]==="s" && v){ S.readDone = S.readDone || {}; S.readDone[s.rid] = today(); }
+  save();
 }
 // Called when any daily step finishes, from anywhere in the app (not only inside the guided flow):
 // marks it done and moves on to the next step, so the user never has to find the next page alone.
-function flowNext(m, k){
-  const flag = {cards:"cards", gram:"gram", write:"ladder", book:"book"}[k];
-  const wasDone = k==="book" ? (!!fd().book || Object.values(game().done).filter(e=>e.d===today()).length > 1) : !!fd()[flag];
-  fd()[flag] = true; save();
+function flowNext(m, k, how){
+  const s0 = todaySteps().find(s=>s.k===k); if(!s0) return false;
+  const wasDone = s0.done;
+  if(!wasDone) markStep(k, how || true);
   if(wasDone && !flowOn()) return false;          // extra practice after the step was already done: normal end screen
+  return advance(m, k);
+}
+function advance(m, k){
   const st = todaySteps(), nx = st.find(s=>!s.done), cur = st.find(s=>s.k===k);
   const nb = document.getElementById("nextbar"); if(nb) nb.remove();
   if(!nx){ setFlow(false); location.hash = "#bugun"; toast("Bugünün planı bitti 🎉"); return true; }
   setFlow(true);
+  const blkChange = cur && nx.blk && cur.blk!==nx.blk && BLK[nx.blk];
   m.innerHTML = `<div style="text-align:center;padding-top:20px">
     <div class="big-ok">${ICON.check.replace('width="16" height="16"','width="40" height="40"')}</div>
-    <h1>${cur ? cur.n : ""} tamam!</h1>
+    <h1>${cur ? esc(cur.n) : ""} tamam!</h1>
     <p class="sub">${pick(PRAISE)}<br>Sıradaki adım ${st.indexOf(nx)+1}/${st.length}</p>
-    <div class="card" style="text-align:left"><div class="tiny">SIRADAKİ</div><h3 style="margin:4px 0">${nx.ic} ${nx.n}</h3><div class="small muted">${esc(nx.d)}</div>
+    <div class="card" style="text-align:left">${blkChange ? `<div class="tag acc" style="margin-bottom:6px">${esc(BLK[nx.blk])}</div>` : ""}<div class="tiny">SIRADAKİ · ${nx.min} DK</div><h3 style="margin:4px 0">${nx.ic} ${esc(nx.n)}</h3><div class="small muted">${esc(nx.d)}</div>
     <div class="bar auto" style="margin-top:12px"><i></i></div></div>
     <button class="btn primary block" data-go>Devam et →</button>
     <button class="btn ghost block" data-pause style="margin-top:6px">Mola ver, sonra devam ederim</button></div>`;
@@ -1262,6 +1387,95 @@ function flowNext(m, k){
   FT = setTimeout(go, 2700);
   m.onclick = e=>{ if(e.target.closest("[data-go]")) go(); if(e.target.closest("[data-pause]")){ clearTimeout(FT); setFlow(false); location.hash = "#bugun"; } };
   return true;
+}
+/* A step that happens outside the app (or needs instructions): what, where, how, then "Bitti". */
+let BT = null;
+function vStep(m, k){
+  const st = todaySteps(), i = st.findIndex(s=>s.k===k), s = st[i];
+  if(!s){ location.hash = "#bugun"; return; }
+  if(s.href !== "#adim/"+k){ location.hash = s.href; return; }
+  const nx = st.find(x=>!x.done && x.k!==k);
+  m.innerHTML = `<div class="between"><a class="btn ghost" href="#bugun">‹ Plan</a><span class="tag acc">Adım ${i+1}/${st.length} · ${s.min} dk</span></div>
+    ${s.blk && BLK[s.blk] ? `<div class="tiny" style="margin-top:10px">${esc(BLK[s.blk]).toUpperCase()}</div>` : ""}
+    <h1 style="margin-top:4px">${s.ic} ${esc(s.n)}</h1><p class="sub">${esc(s.d)}</p>
+    ${s.brk ? `<div class="card" style="text-align:center"><div id="brkT" style="font-size:48px;font-weight:700;font-variant-numeric:tabular-nums">${s.brk}:00</div><div class="small muted">Süre bitince seni sıradaki adıma götüreceğim${nx ? `: ${nx.ic} ${esc(nx.n)}` : ""}.</div></div>` : ""}
+    ${s.how ? `<div class="card"><div class="tiny">NASIL YAPACAKSIN</div><ol class="small" style="margin:6px 0 0;padding-left:20px;line-height:1.6">${s.how.map(h=>`<li>${h}</li>`).join("")}</ol></div>` : ""}
+    ${s.btns ? `<div class="stack">${s.btns.map(([l,h,ext])=>`<a class="btn ${ext?"":"primary"} block" href="${h}"${ext?' target="_blank" rel="noopener"':""}>${esc(l)}</a>`).join("")}</div>` : ""}
+    ${s.alt ? `<p class="small muted">${esc(s.alt)}</p>` : ""}
+    ${s.item ? (()=>{ const ph = (fd().ph||{})[k] || 0, ck = (fd().chk||{})[k];
+      return `<div class="card"><div class="tiny">📸 KONTROL VE KANIT</div>
+      <ol class="small" style="margin:6px 0 10px;padding-left:20px;line-height:1.6"><li>Kitap ekrandaysa çözdüğün sayfanın <b>ekran görüntüsünü</b> al (bilgisayarda <b>Win+Shift+S</b>, sonra bu sayfada <b>Ctrl+V</b>; telefonda ekran görüntüsünü aşağıdaki düğmeyle seç). Kâğıttaysa fotoğrafını çek. Görsel eklenince adım kendiliğinden işaretlenir.</li><li>“Kontrol ettir”e dokun: hazır komutu Claude'a ya da ChatGPT'ye yapıştır, <b>aynı görselleri de sohbete ekle</b>.</li><li>İstersen gelen cevabı buraya kaydet; hatalarını sonra yine görürsün.</li></ol>
+      <label class="btn block" style="cursor:pointer">🖼️ Ekran görüntüsü / fotoğraf ekle${ph ? ` (${ph} eklendi)` : ""}<input type="file" accept="image/*" multiple data-photo hidden></label>
+      <div id="phs" class="row" style="gap:6px;margin-top:8px"></div>
+      <button class="btn primary block" data-check style="margin-top:8px">🧑‍🏫 Kontrol ettir (Claude / ChatGPT)</button>
+      ${ck ? `<details style="margin-top:8px"><summary class="small"><b>Kaydedilen kontrol sonucu</b></summary><div class="small" style="white-space:pre-wrap;margin-top:6px">${esc(ck)}</div></details>` : ""}
+      <p class="tiny" style="margin:8px 0 0">Görseller sadece bu cihazda kalır; Drive'a gitmez.</p></div>`; })() : ""}
+    <button class="btn primary block" data-sdone style="margin-top:14px">${s.brk ? "Molayı bitir, devam et →" : s.done ? "✓ Yapıldı · sıradakine geç →" : "Bitti ✓ · sıradakine geç"}</button>
+    ${s.done || s.brk ? "" : `<p class="tiny" style="text-align:center;margin-top:8px"><a href="#" data-sskip style="color:inherit">Bugün bunu atla (sorun değil)</a></p>`}`;
+  if(s.brk){ const end = Date.now() + s.brk*60000; clearInterval(BT);
+    BT = setInterval(()=>{ const el = document.getElementById("brkT"); if(!el){ clearInterval(BT); return; } const r = Math.max(0, end-Date.now());
+      el.textContent = Math.floor(r/60000) + ":" + String(Math.floor(r/1000)%60).padStart(2,"0"); if(!r){ clearInterval(BT); flowNext(m, k); } }, 1000); }
+  if(s.item){
+    const d = fd(), n = (d.ph||{})[k] || 0;
+    (async ()=>{ for(let j=0;j<n;j++){ const u = await idbGet(`ph:${today()}:${k}:${j}`).catch(()=>null), box = $("#phs"); if(u && box) box.insertAdjacentHTML("beforeend", `<img src="${u}" alt="Sayfa fotoğrafı ${j+1}" style="width:72px;height:96px;object-fit:cover;border-radius:8px;border:1px solid var(--line)">`); } })();
+    const inp = m.querySelector("[data-photo]");
+    const add = async files=>{ files = files.filter(f=>/^image\//.test(f.type)); if(!files.length) return;
+      for(const f of files){ const url = await shrinkImg(f); const dd = fd(); dd.ph = dd.ph || {}; const j = dd.ph[k] || 0; await idbPut(`ph:${today()}:${k}:${j}`, url); dd.ph[k] = j+1; }
+      if(!stepGet(k) && !s.done) markStep(k, true); else save();
+      toast(`📷 ${files.length} görsel eklendi · adım işaretlendi ✓`); if(location.hash==="#adim/"+k) vStep(m, k); };
+    inp.onchange = ()=>add([...inp.files]);
+    // screenshot pasted with Ctrl+V (Win+Shift+S / Cmd+Shift+4 copies it), only while this step page is open
+    document.onpaste = e=>{ if(location.hash!=="#adim/"+k){ document.onpaste = null; return; } const fs = [...((e.clipboardData||{}).files||[])]; if(fs.length){ e.preventDefault(); add(fs); } };
+  }
+  m.onclick = e=>{
+    if(e.target.closest("[data-check]")){ const x = s.item, lvl = LV[Math.max(0, Math.min(4, workOf("grammar")))];
+      bridge("Kitap sayfamı kontrol et", `Ben Türkçe konuşan, İngilizce seviyesi yaklaşık ${lvl} olan bir öğrenciyim. Ekteki görseller (ekran görüntüsü ya da fotoğraf) bugün kitaptan çözdüğüm sayfalar: "${x.l}".\n\n1. Önce neyi doğru yaptığımı kısaca söyle.\n2. Yanlışlarımı tek tek göster: soru numarası, benim cevabım, doğrusu ve nedeni (Türkçe, tek cümle). En fazla 5 tanesini ayrıntılı anlat, kalanları sadece listele.\n3. Boş bıraktığım yer varsa önce ipucu ver, cevabı hemen söyleme.\n4. Sonunda doğru sayımı "x/y doğru" diye yaz ve aynı konudan bana 3 yeni benzer soru sor.\n\nGörselde okuyamadığın bir yer varsa tahmin etme, bana söyle. Sade ve cesaretlendirici ol; hata benim için bilgi.`,
+        {tip:"Komutu yapıştırdıktan sonra sayfa görsellerini de sohbete ekle (ataş / + simgesi ya da Ctrl+V). ChatGPT'de de aynı komut çalışır.", save: v=>{ const dd = fd(); dd.chk = dd.chk || {}; dd.chk[k] = v; save(); vStep(m, k); }}); return; }
+    if(e.target.closest("[data-sdone]")){ clearInterval(BT); if(!flowNext(m, k)) advance(m, k); return; }
+    if(e.target.closest("[data-sskip]")){ e.preventDefault(); clearInterval(BT); flowNext(m, k, "skip"); }
+  };
+}
+// photo → small JPEG data URL (≈1200px) so a page photo stays a few hundred KB on the device
+function shrinkImg(file){ return new Promise(ok=>{ const r = new FileReader(); r.onload = ()=>{ const im = new Image(); im.onload = ()=>{
+  const sc = Math.min(1, 1200/Math.max(im.width, im.height)), c = document.createElement("canvas"); c.width = Math.round(im.width*sc); c.height = Math.round(im.height*sc);
+  c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); ok(c.toDataURL("image/jpeg", 0.72)); }; im.onerror = ()=>ok(r.result); im.src = r.result; }; r.readAsDataURL(file); }); }
+/* ---------- Gramer+: extra practice for a lesson (fix the mistake, translate, transform) ---------- */
+let GXS = null;
+function gxLesson(){ const d = fd(), id = d.lesson && lessonPassed(d.lesson) ? d.lesson : (lastPassed() || d.lesson); const L = lessonById(id); return L && GX.X[L.id] ? L : null; }
+function vGX(m, sub){
+  const L = sub ? lessonById(sub) : gxLesson(), li = L ? LESSONS.indexOf(L) : -1;
+  // from the daily plan: this lesson's questions plus the previous lesson's (a little spaced review)
+  const prev = !sub && li>0 && lessonPassed(LESSONS[li-1].id) ? GX.X[LESSONS[li-1].id] || [] : [];
+  const items = L && GX.X[L.id] && [...GX.X[L.id], ...prev];
+  if(!items){ m.innerHTML = `<h1>🔧 Gramer+</h1><p class="sub">Ek alıştırmalar bir gramer dersinin üstüne gelir. Önce bugünkü dersi bitir.</p><a class="btn primary" href="${todaySteps().find(s=>s.k==="gram").href}">Gramer dersine git →</a>`; return; }
+  if(!GXS || GXS.id!==L.id || GXS.items.length!==items.length) GXS = {id:L.id, i:0, ok:0, res:null, items};
+  const n = items.length, ex = GX.E[L.id];
+  if(GXS.i >= n){
+    const r = GXS.ok; GXS = null; logAdd("gx");
+    if(!sub && flowNext(m, "gramx")) return;
+    m.innerHTML = `<div style="text-align:center;padding-top:20px"><div class="big-ok">${ICON.check.replace('width="16" height="16"','width="40" height="40"')}</div><h1>Gramer+ tamam</h1><p class="sub">${r}/${n} doğru ya da çok yakın. ${pick(PRAISE)}</p>
+      <a class="btn primary block" href="#bugun">Plana dön</a></div>`; return; }
+  const [t, q, a] = GXS.items[GXS.i], lab = {fix:"Hatayı bul ve doğrusunu yaz", tr:"İngilizceye çevir", tf:"Dönüştür"}[t] || "Yaz";
+  const res = GXS.res;
+  m.innerHTML = `<div class="between"><a class="btn ghost" href="${sub ? "#gramer/"+L.id : "#bugun"}">‹ ${sub ? "Ders" : "Plan"}</a><span class="tag acc">${GXS.i+1}/${n}</span></div>
+    <div class="tiny" style="margin-top:10px">GRAMER+ · ${esc(L.t)}</div>
+    ${GXS.i===0 && ex ? ex.map(([h, tx, eg])=>`<div class="card soft small"><b>🎯 Sınav köşesi: ${esc(h)}</b><div style="margin-top:4px">${esc(tx)}</div>${(eg||[]).map(x=>`<div lang="en" style="margin-top:4px"><i>${esc(x)}</i></div>`).join("")}</div>`).join("") : ""}
+    <div class="card"><div class="small muted">${lab}</div><h3 style="margin:6px 0 10px"${t==="tr"?"":' lang="en"'}>${esc(q)}</h3>
+    <textarea id="gxa" rows="2" lang="en" placeholder="Cevabını İngilizce yaz…" ${res?"disabled":""}>${esc(res ? res.v : "")}</textarea>
+    ${res ? `<div class="card soft small" style="margin:10px 0 0">${res.ok ? `<b>${res.exact ? "Doğru! ✓" : "Çok yakın ✓"}</b>` : `<b>Doğrusu:</b>`} <div lang="en" style="margin-top:4px">${res.html}</div>${res.ok && res.exact ? "" : `<div class="tiny" style="margin-top:4px">Renkli olmayan kelimeler senin cevabında yoktu. Hata = bilgi.</div>`}</div>
+      <button class="btn primary block" data-gxn style="margin-top:10px">${GXS.i+1<n ? "Sıradaki →" : "Bitir"}</button>`
+    : `<div class="row" style="margin-top:10px"><button class="btn primary" data-gxc>Kontrol et</button><button class="btn ghost" data-gxs>Bilmiyorum, göster</button></div>`}</div>`;
+  const ta = $("#gxa"); if(ta && !res) ta.focus();
+  m.onclick = e=>{
+    if(e.target.closest("[data-gxc]") || e.target.closest("[data-gxs]")){
+      const v = e.target.closest("[data-gxs]") ? "" : ($("#gxa").value||"").trim(); if(!v && e.target.closest("[data-gxc]")){ toast("Önce bir cevap yaz"); return; }
+      const alts = a.split(" / "), exact = !!v && alts.some(x=>nrm(x)===nrm(v));
+      const best = alts.map(x=>({x, c: compare(x, v)})).sort((p,q2)=>q2.c.pct-p.c.pct)[0];
+      const ok = exact || (!!v && best.c.pct>=85 && norm(v).length <= norm(best.x).length+1);
+      if(ok) GXS.ok++;
+      GXS.res = {v, ok, exact, html: v ? best.c.html : esc(alts[0])}; vGX(m, sub); return; }
+    if(e.target.closest("[data-gxn]")){ GXS.i++; GXS.res = null; vGX(m, sub); }
+  };
 }
 
 /* ---------- grammar course views ---------- */
@@ -1295,7 +1509,8 @@ function vLesson(m, L){
   ${sec("🗣️","Örnekler")}<div class="card">${L.ex.map(([en,tr])=>`<div class="between" style="padding:6px 0;border-top:1px solid var(--line)"><div><div lang="en">${esc(en)}</div><div class="small muted">${esc(tr)}</div></div>${sayBtn(en)}</div>`).join("").replace('border-top:1px solid var(--line)',"")}</div>
   ${sec("⚠️","Türklerin tuzağı")}<div class="card trap">${L.trap.map(([x,v,note])=>`<div style="padding:6px 0"><div class="x" lang="en">✗ ${esc(x)}</div><div class="v" lang="en">✓ ${esc(v)}</div><div class="small muted">${esc(note)}</div></div>`).join("")}</div>
   ${sec("✏️","Alıştırma")}<div class="card"><p class="small" style="margin:0 0 10px">${L.q.length} kısa soru. Yanlış yaptıkların sonda bir kez daha gelir; %70 ve üstü ile ders tamam sayılır.</p>
-  <a class="btn primary block" href="#gramer/${L.id}/pratik">Alıştırmaya geç →</a></div>
+  <a class="btn primary block" href="#gramer/${L.id}/pratik">Alıştırmaya geç →</a>
+  ${d && d.pass && GX.X[L.id] ? `<a class="btn block" href="#gx/${L.id}" style="margin-top:8px">🔧 Gramer+: ${GX.X[L.id].length} ek soru (düzelt, çevir, dönüştür)</a>` : ""}</div>
   ${(()=>{ const u = LESSONS.indexOf(L)+1, eg = S.pack && S.pack.egiu && S.pack.egiu[u]; return `<div class="card soft small">🎮 Ünite ${u}: alıştırmayı geçince İlerleme Oyunu'na <b>+30 XP</b> kendiliğinden yazılır.${eg ? `<div style="margin-top:6px">📘 <b>Takıldıysan</b> (%85'in altı): ${esc(eg)} · takviye klasöründeki kitapta, s. = PDF sayfası.</div>` : ""}</div>`; })()}
   <p class="tiny" style="text-align:center"><a href="#" data-ask style="color:inherit">Hâlâ karışık mı? Claude'a bu konuyu başka örneklerle anlattır</a></p>`;
   m.onclick = e=>{ if(gameClick(e, ()=>vLesson(m, L))) return; if(e.target.closest("[data-ask]")){ e.preventDefault(); bridge("Gramer: "+L.t, P.grammar(L.t, LV[L.lv])); } };
@@ -1497,7 +1712,8 @@ function bookRead(el, id){
   <h2>Sorular</h2><div class="card">${Q.map((q,i)=>`<div style="padding:8px 0;border-top:${i?"1px solid var(--line)":"0"}"><div class="small"${q.o[0]==="Doğru"?"":' lang="en"'}><b>${i+1}.</b> ${q.m?"<b>Ana fikir:</b> ":""}${esc(q.t)}</div>
     <div class="row" style="margin-top:6px;gap:6px">${q.o.map((o,j)=>{ const sel = BR.a[i]===j, ok = BR.chk && j===q.a, bad = BR.chk && sel && j!==q.a;
       return `<button class="chip" data-qa="${i}:${j}" style="${sel?"outline:2px solid var(--acc);":""}${ok?"background:#2e9e6a;color:#fff;":""}${bad?"background:#e08a2e;color:#fff;":""}"${q.o[0]==="Doğru"?"":' lang="en"'}>${esc(o)}</button>`; }).join("")}</div></div>`).join("")}
-   ${BR.chk ? `<div class="card soft" style="margin:10px 0 0"><b>${right}/${Q.length} doğru (%${Math.round(100*right/Q.length)})</b>${R.min?` · ${mins} dakika`:""}<div class="small" style="margin-top:4px">${right/Q.length>=.9?"Harika! Sürekli böyleyse bir üst seviyeden metin dene.":right/Q.length>=.7?"Tam %85 bölgesindesin, böyle devam.":"Bu metin şimdilik zorladı. Turuncu yanlışların kanıt cümlesini metinde bul; yarın bir kolay metin oku."}</div></div>`
+   ${BR.chk ? `<div class="card soft" style="margin:10px 0 0"><b>${right}/${Q.length} doğru (%${Math.round(100*right/Q.length)})</b>${R.min?` · ${mins} dakika`:""}<div class="small" style="margin-top:4px">${right/Q.length>=.9?"Harika! Sürekli böyleyse bir üst seviyeden metin dene.":right/Q.length>=.7?"Tam %85 bölgesindesin, böyle devam.":"Bu metin şimdilik zorladı. Turuncu yanlışların kanıt cümlesini metinde bul; yarın bir kolay metin oku."}</div>
+     ${(()=>{ const s = todaySteps().find(x=>x.rid===id); return s ? `<button class="btn primary block" data-snext="${s.k}" style="margin-top:10px">✓ Okuma adımı tamam · sıradakine geç →</button><div class="tiny" style="margin-top:4px">İstersen önce aşağıdaki yazma görevini yap; isteğe bağlı.</div>` : ""; })()}</div>`
      : `<button class="btn primary block" data-chk style="margin-top:10px">Kontrol et</button>`}</div>
   ${R.task ? `<h2>Yazma görevi</h2><div class="card stack"><p class="small" style="margin:0">${esc(R.task)}</p><textarea id="btask" rows="4" lang="en" placeholder="Write here…">${esc((prev&&prev.task)||"")}</textarea>
    <div class="row"><button class="btn sm" data-tsave>Kaydet</button><button class="btn ghost sm" data-tcl>Claude'a kontrol ettir</button></div></div>` : ""}`;
@@ -1506,7 +1722,9 @@ function bookRead(el, id){
     const qa = e.target.closest("[data-qa]"); if(qa && !BR.chk){ const [i,j] = qa.dataset.qa.split(":").map(Number); BR.a[i] = j; bookRead(el, id); return; }
     if(e.target.closest("[data-chk]")){ if(Object.keys(BR.a).length < Q.length && !confirm("Boş bıraktığın sorular var. Yine de kontrol edeyim mi?")) return;
       BR.chk = true; const r = Q.filter((q,i)=>BR.a[i]===q.a).length, p = g.rd[id];
-      if(!p || r > p.best) g.rd[id] = Object.assign({}, p, {best:r, of:Q.length, d:today()}); save(); bookRead(el, id); return; }
+      if(!p || r > p.best) g.rd[id] = Object.assign({}, p, {best:r, of:Q.length, d:today()});
+      const s = todaySteps().find(x=>x.rid===id); if(s && !s.done) markStep(s.k, true); save(); bookRead(el, id); return; }
+    if(e.target.closest("[data-snext]")){ advance(el, e.target.closest("[data-snext]").dataset.snext); return; }
     if(e.target.closest("[data-tsave]")){ g.rd[id] = Object.assign({best:0, of:Q.length, d:today()}, g.rd[id], {task: $("#btask").value}); save(); toast("Kaydedildi"); return; }
     if(e.target.closest("[data-tcl]")){ const t = $("#btask").value.trim(); if(!t){ toast("Önce birkaç cümle yaz"); return; }
       bridge("Yazma görevimi kontrol et", `Ben Türkçe konuşan bir İngilizce öğrencisiyim (${R.lv}). "${R.t}" metnini okudum. Görev: ${R.task}\nYazdığım:\n${t}\n\nEn fazla 3 hatamı ipucu vererek göster, nedenini Türkçe tek cümleyle açıkla, doğru hâllerini en sonda ver. Bir şeyi iyi yaptıysam onu da söyle.`); return; }
@@ -1516,7 +1734,8 @@ function bookRead(el, id){
   };
 }
 function pRead(el, arg){
-  if(arg && bookReads().length) return bookRead(el, arg);
+  if(arg && /^s\d+$/.test(arg) && READS[+arg.slice(1)]){ if(!RD || RD.sid!==arg){ const r = READS[+arg.slice(1)]; RD = {text:r.x, title:r.t, lv:r.lv, sid:arg}; } }
+  else if(arg && bookReads().length) return bookRead(el, arg);
   if(!RD || !RD.text || RD.book){ RD = null;
     const br = bookReads(), rd = (S.game && S.game.rd) || {};
     el.innerHTML = `<div class="card small"><b>Okurken kaybolmamak için 4 adım:</b><ol style="margin:6px 0 0;padding-left:20px"><li>Başlığa ve ilk cümleye bak: konu ne?</li><li>Bir kez durmadan oku. Her kelimeyi anlaman gerekmiyor.</li><li>Anlamı önemli görünen en fazla 5 kelimeye dokun.</li><li>Ana fikri Türkçe tek cümleyle yaz, Claude'a kontrol ettir.</li></ol></div>
@@ -1587,11 +1806,11 @@ function startSyn(){
 // Approximate cumulative guided-learning hours to reach each level (Cambridge estimates): A1, A2, B1, B2, C1
 const LV_HOURS = [100, 200, 375, 550, 800];
 const PACES = {
-  20:{n:"Hafif", items:["Bugün akışı: Kelime → Gramer → Cümle kur"]},
-  45:{n:"Dengeli", items:["Bugün akışı (18 dk)","Bonus görev: okuma, dinleme ya da konuşma (12 dk)","15 dk İngilizce altyazılı dizi ya da video"]},
-  60:{n:"Kararlı", items:["Bugün akışı (18 dk)","Bonus görev (12 dk)","15 dk dizi ya da video","15 dk okuma: Pratik › Oku'dan bir Okuma Kitabı metni"]},
-  90:{n:"Yoğun", items:["Bugün akışı (18 dk)","Bonus görev (12 dk)","Gramer sekmesinden 2. ders (8 dk)","20 dk kitap bölümü","30 dk dizi / podcast, sınav kelime paketi günde 12 kart"]},
-  180:{n:"Kamp", items:["Bugün akışı (18 dk)","Gramer: 2–3 ders + tekrar (25 dk)","Kelime: sınav paketi günde 20 kart + eş anlamlı testi (20 dk)","Okuma: 2 metin, Pratik → Oku ya da okuma kitabı (30 dk)","Dinleme: 1 saat. Önce metne bakmadan not alarak dinle, sonra metinle tekrar dinle.","Yazma / konuşma: Claude ile 20 dk (paragraf, essay ya da sohbet)","Haftada bir: koç raporu ve deneme"]}
+  20:{n:"Hafif", items:["Kelime kartları → Gramer dersi → Cümle kur (≈18 dk)"]},
+  45:{n:"Dengeli", items:["Kelime → Gramer → Cümle kur (23 dk)","Okuma: uygulamadaki sıradaki metin (12 dk)","Dinleme: seviyene göre belirli bir ders, bağlantısıyla (10 dk)"]},
+  60:{n:"Kararlı", items:["Kelime → Gramer → Gramer+ ek alıştırma → Cümle kur (30 dk)","Okuma (12 dk)","Dinleme (10 dk)","Konuşma: gölge okuma + 1 dk konuşma (8 dk)"]},
+  90:{n:"Yoğun", items:["Blok 1: Kelime, Gramer, Gramer+, Cümle kur (35 dk)","5 dk mola","Blok 2: Okuma, Dinleme, Konuşma, Claude sohbeti (50 dk)"]},
+  180:{n:"Kamp", items:["Blok 1 · Temel: Kelime, Gramer, Gramer+, Cümle kur (50 dk)","10 dk mola","Blok 2 · Girdi: 2 okuma metni + dinleme (55 dk)","10 dk mola","Blok 3 · Çıktı ve keyif: dizi bölümü, konuşma, Claude sohbeti, kapanış (55 dk)","Kitaplar yanındaysa bazı adımlar kitabın belirli sayfalarına dönüşür"]}
 };
 function resting(){ return !!(S.settings.rest && S.settings.rest >= today()); }
 function basePace(){ return resting() ? 5 : (S.settings.pace || 45); }
@@ -1876,7 +2095,8 @@ function syncGram(){ const g = game(); LESSONS.forEach((L,i)=>{ const d = gr().d
 function gameClick(e, redraw){
   const t = e.target.closest("[data-gtick]"); if(t){ e.preventDefault(); const g = game(), k = t.dataset.gtick;
     if(g.done[k]) delete g.done[k]; else { g.done[k] = {d: today(), xp: +t.dataset.xp, l: t.dataset.l}; toast(`+${t.dataset.xp} XP ✨`);
-      lvCheck(); save(); if(todaySteps().some(s=>s.k==="book") && flowNext($("#main"), "book")) return true; }
+      lvCheck(); save(); const s = todaySteps().find(x=>x.item && x.item.k===k);
+      if(s){ const d = fd(); d.st = d.st || {}; d.st[s.k] = true; save(); return advance($("#main"), s.k); } }
     lvCheck(); save(); redraw(); return true; }
   return false;
 }
@@ -2040,29 +2260,32 @@ const TABS = [
 function route(){ const h = (location.hash||"#bugun").slice(1).split("/"); return {page:h[0]||"bugun", sub:h[1]||"", arg:h[2]||""}; }
 function render(){
   if("speechSynthesis" in window) speechSynthesis.cancel();
-  stopRec(); clearTimeout(FT); FT = null;
+  stopRec(); clearTimeout(FT); FT = null; clearInterval(BT);
   const r = route();
   const inTest = r.page==="test";
-  const tab = {ben:"rehber", kaynak:"rehber", cumle:"bugun", oyun:"rehber"}[r.page] || r.page;
+  const tab = {ben:"rehber", kaynak:"rehber", cumle:"bugun", oyun:"rehber", adim:"bugun", gx:"gramer"}[r.page] || r.page;
   $("#tabbar").style.display = inTest || !S.onboarded ? "none" : "";
   $("#tabbar").innerHTML = `<nav>${TABS.map(t=>`<a href="#${t[0]}" ${t[0]===tab?'aria-current="page"':""}>${t[2]}${t[1]}</a>`).join("")}</nav>`;
   const m = $("#main"); m.onclick = null;
   if(!S.onboarded && !inTest){ m.innerHTML = vWelcome(); bindWelcome(); return; }
-  const V = {bugun:vToday, kelime:vCards, gramer:vGram, cumle:(m,s)=>vLadder(m,s), pratik:vPractice, rehber:vGuide, oyun:vGame, kaynak:vRes, ben:vMe, test:vTest, sonuc:vResult}[r.page] || vToday;
+  const V = {bugun:vToday, kelime:vCards, gramer:vGram, cumle:(m,s)=>vLadder(m,s), pratik:vPractice, rehber:vGuide, oyun:vGame, adim:vStep, gx:vGX, kaynak:vRes, ben:vMe, test:vTest, sonuc:vResult}[r.page] || vToday;
   V(m, r.sub, r.arg); window.scrollTo(0,0);
   // "What's next" bar on every page: one tap back onto today's path
   const old = document.getElementById("nextbar"); if(old) old.remove();
   document.body.classList.remove("hasnext");
   if(S.onboarded && !inTest && r.page!=="bugun"){
-    const st = todaySteps(), i = st.findIndex(s=>!s.done);
-    if(i>=0){ const nx = st[i], here = location.hash===nx.href || (nx.k==="gram" && location.hash.startsWith(nx.href)) || (nx.k==="cards" && location.hash.startsWith("#kelime"));
+    const st = todaySteps(); let i = st.findIndex(s=>!s.done);
+    const on = s => location.hash===s.href || (s.k==="gram" && location.hash.startsWith(s.href)) || (s.k==="cards" && location.hash.startsWith("#kelime")) || (s.at||[]).some(a=>location.hash.startsWith(a));
+    const hi = st.findIndex(s=>!s.done && on(s));   // the page you are on belongs to an open step (even out of order)
+    if(i>=0){ if(hi>=0) i = hi; const nx = st[i], here = hi>=0;
       $("#tabbar").insertAdjacentHTML("afterbegin", here
-        ? `<div class="nextbar here" id="nextbar"><span>📍</span><span style="flex:1">Şu an adım ${i+1}/${st.length}: ${nx.ic} ${nx.n}. Bitince seni sıradakine götüreceğim.</span><a href="#bugun" style="color:inherit;font-weight:600">Plan</a></div>`
+        ? `<div class="nextbar here" id="nextbar"><span>📍</span><span style="flex:1">Şu an adım ${i+1}/${st.length}: ${nx.ic} ${esc(nx.n)}.${nx.manual ? "" : " Bitince seni sıradakine götüreceğim."}</span>${nx.manual ? `<button class="btn primary sm" data-barDone="${nx.k}">Bitti ✓</button>` : `<a href="#bugun" style="color:inherit;font-weight:600">Plan</a>`}</div>`
         : `<a class="nextbar" id="nextbar" href="${nx.href}" data-nextbar><span>▶</span><span style="flex:1">Sıradaki adım ${i+1}/${st.length}: ${nx.ic} ${nx.n}</span><span style="opacity:.85">${nx.min} dk ›</span></a>`);
       document.body.classList.add("hasnext"); }
   }
 }
-document.addEventListener("click", e=>{ if(e.target.closest("[data-nextbar]")) setFlow(true); });
+document.addEventListener("click", e=>{ if(e.target.closest("[data-nextbar]")) setFlow(true);
+  const b = e.target.closest("[data-bardone]"); if(b){ e.preventDefault(); const m = $("#main"); window.scrollTo(0,0); if(!flowNext(m, b.dataset.bardone)) advance(m, b.dataset.bardone); } });
 window.addEventListener("hashchange", render);
 
 /* ================= WELCOME ================= */
@@ -2263,13 +2486,17 @@ function vToday(m){
     const body = moodCard() + `<div class="card" style="margin-top:-6px"><div class="small" style="margin-bottom:6px"><b>Bugün ne kadar vaktin var?</b> <span class="tiny">Plan buna göre kısalır ya da uzar.</span></div><div class="row">${AVAIL.map(([n,l])=>`<button class="chip" data-avail="${n}" aria-pressed="${pace()===n}">${l}</button>`).join("")}</div></div>`;
     return (mo || av) && !allDone ? `<details><summary class="small muted" style="margin:0 0 10px;cursor:pointer">${mo?mo[1]:"🙂"} · ${av?av[1]:pace()+" dk"} · <u>değiştir</u></summary>${body}</details>` : allDone ? "" : body; })()}
   <div class="card" style="border:2px solid var(--accent)"><div class="between"><h3 style="margin:0">📘 Bugünkü planın</h3><span class="tag acc">${allDone?"bitti ✓":`adım ${cur+1}/${steps.length}`}</span></div>
-   <div class="steps">${steps.map((s,i)=>`<a class="sr ${i===cur?"cur":""}" href="${s.href}" data-step="${i}" style="text-decoration:none;color:inherit"><span class="dot ${s.done?"on":""}">${s.done?ICON.check:i+1}</span>
-     <span style="flex:1;min-width:0"><b>${s.ic} ${s.n}</b><span class="small muted" style="display:block">${esc(s.d)}</span></span><span class="tiny">${s.min} dk</span></a>`).join("")}</div>
+   ${pace()>=45 && !allDone ? `<div class="small" style="margin:8px 0 2px">📕 Kitapların bugün yanında mı? <span class="row" style="display:inline-flex;gap:6px;vertical-align:middle"><button class="chip" data-books="1" aria-pressed="${booksOn()}">Evet</button><button class="chip" data-books="0" aria-pressed="${!booksOn()}">Hayır</button></span>
+     <div class="tiny" style="margin-top:2px">${booksOn() ? "Bazı adımlar kitabın belirli sayfalarına dönüştü (📕/📗 işaretli)." : "Sorun değil: her şey uygulamanın içinde. Okuma metinleri, alıştırmalar ve sorular burada."}</div></div>` : ""}
+   <div class="steps">${steps.map((s,i)=>`${s.blk && (i===0 || steps[i-1].blk!==s.blk) && BLK[s.blk] && steps.some(x=>x.blk>1) ? `<div class="tiny" style="margin:12px 0 0;font-weight:700;color:var(--accent)">${esc(BLK[s.blk]).toUpperCase()}</div>` : ""}<div class="sr ${i===cur?"cur":""}">
+     <button class="dot ${s.done?"on":""}" data-stick="${s.k}" aria-label="${esc(s.n)}: ${s.done?"yapılmadı olarak işaretle":"yapıldı olarak işaretle"}" style="border:0;cursor:pointer;font:inherit">${s.done?ICON.check:i+1}</button>
+     <a href="${s.href}" data-step="${i}" style="flex:1;min-width:0;text-decoration:none;color:inherit;display:flex;gap:10px;align-items:center"><span style="flex:1;min-width:0"><b>${s.ic} ${esc(s.n)}</b><span class="small muted" style="display:block">${esc(s.d)}${(d.ph||{})[s.k] ? ` · 📷 ${d.ph[s.k]} fotoğraf` : ""}${(d.chk||{})[s.k] ? " · 🧑‍🏫 kontrol edildi" : ""}</span>${s.book ? `<span class="tiny" style="display:block">📕 ${esc(s.book)}</span>` : ""}</span><span class="tiny" style="flex:none">${s.min} dk ›</span></a></div>`).join("")}</div>
+   ${!allDone ? `<p class="tiny" style="margin:6px 0 0">Daire = işaret kutusu: yaptığın bir şeyi elle işaretleyebilir ya da işareti kaldırabilirsin.</p>` : ""}
    ${allDone ? `<div class="card soft" style="margin:10px 0 0"><b>✓ Bugünlük bu kadar.</b> Artık dinlenebilirsin; yarın burası seni yine sırayla götürecek. <span class="small muted">Yarın: ${esc((nextLesson()||{}).t || "tekrar günü")}.</span>
         <div class="row" style="margin-top:8px">${(game().dice||{})[today()] ? "" : `<button class="btn sm" data-dice>🎲 İstersen zar at (keyifli kapanış)</button>`}</div></div>`
      : `<button class="btn primary block" data-flow style="margin-top:10px">${cur===0 && !steps.some(s=>s.done) ? "Başla" : "Devam et"} → ${steps[cur].ic} ${steps[cur].n}</button>
         <p class="tiny" style="text-align:center;margin:6px 0 0">${tiny ? "Bugün yoğunsun: sadece kartlar da yeter, ders yarına kalabilir." : "Başka bir sayfaya gitmene gerek yok: her adım bitince uygulama seni kendiliğinden sıradakine götürür. Kaybolursan alttaki mor ▶ çubuğa dokun."}</p>
-        ${steps[cur].k==="book" ? `<p class="tiny" style="text-align:center;margin:4px 0 0"><a href="#" data-skipbook style="color:inherit">Bugün kitaba vaktim yok, atla</a></p>` : ""}`}</div>
+        `}</div>
   ${coachDue ? `<a class="card between" href="#rehber" style="text-decoration:none;color:inherit"><div><h3 style="margin:0">🧑‍🏫 Haftalık değerlendirme zamanı</h3><div class="small muted">Rehber'de raporunu Claude'a gönder, detaylı geri bildirim ve gelecek haftanın planını al.</div></div>›</a>` : ""}
   <details class="card"><summary><b>📊 İlerlemen, oyun ve hedef tarihler</b></summary><div style="margin-top:10px">${gameCard()}${paceCard(true, true)}
    <div class="card"><div class="between" style="margin-bottom:10px"><h3 style="margin:0">Bu hafta</h3><span class="tag acc">${count}/6 gün</span></div><div class="week">${week}</div></div></div></details>
@@ -2282,7 +2509,8 @@ function vToday(m){
     if(paceClick(e, ()=>vToday(m))) return;
     if(gameClick(e, ()=>vToday(m))) return;
     if(e.target.closest("[data-dice]")){ rollDice(); location.hash = "#oyun"; return; }
-    if(e.target.closest("[data-skipbook]")){ e.preventDefault(); fd().book = true; save(); vToday(m); return; }
+    const bk = e.target.closest("[data-books]"); if(bk){ const v = bk.dataset.books==="1"; fd().books = v; S.settings.books = v; save(); vToday(m); return; }
+    const sk = e.target.closest("[data-stick]"); if(sk){ const s = steps.find(x=>x.k===sk.dataset.stick); markStep(s.k, !s.done); if(!s.done) toast("İşaretlendi ✓"); vToday(m); return; }
     if(e.target.closest("[data-flow]") || e.target.closest("[data-step]")){ e.preventDefault(); const i = e.target.closest("[data-step]") ? +e.target.closest("[data-step]").dataset.step : cur; setFlow(true); location.hash = steps[i].href; return; }
     const tk = e.target.closest("[data-tick]");
     if(tk){ S.done[t] = Object.assign({}, S.done[t]); S.done[t].main = !S.done[t].main; save(); vToday(m); if(S.done[t].main) toast("Tamamlandı ✓"); return; }
