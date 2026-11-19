@@ -800,6 +800,10 @@ function mergeState(L, R){
   M.miles = Object.assign({}, R.miles||{}, L.miles||{});
   if(R.media){ M.media = M.media || {}; ["ser","lis"].forEach(s=>{ const a = M.media[s] = M.media[s] || {}; Object.entries(R.media[s]||{}).forEach(([k,v])=>a[k] = Math.max(a[k]||0, v)); }); }
   if(R.readDone) M.readDone = Object.assign({}, R.readDone, M.readDone||{});
+  // phrases / exam groups: keep the one seen most recently; scenes: union
+  ["ph","ex"].forEach(f=>{ if(!R[f]) return; M[f] = M[f] || {}; Object.entries(R[f]).forEach(([k,b])=>{ const a = M[f][k];
+    if(!a || (b.seen||0)+(b.used||0) > (a.seen||0)+(a.used||0) || ((b.seen||0)===(a.seen||0) && (b.due||"") > (a.due||""))) M[f][k] = Object.assign({}, b, a && a.mine && !b.mine ? {mine:a.mine} : {}); }); });
+  if(R.sc){ M.sc = M.sc || {}; Object.entries(R.sc).forEach(([k,b])=>{ const a = M.sc[k]; if(!a || (b.d||"") > (a.d||"")) M.sc[k] = b; }); }
   M.grammarDone = [...new Set([...(L.grammarDone||[]), ...(R.grammarDone||[])])];
   M.journal = byKey([...(R.journal||[]), ...(L.journal||[])], j=>j.id).sort((a,b)=>a.id-b.id);
   if(R.wr){
@@ -1229,9 +1233,9 @@ const yt = q => "https://www.youtube.com/results?search_query=" + encodeURICompo
 // Series in order of difficulty. The app remembers which episode is next.
 const SERIES = [
   {id:"extra", n:"Extr@ English", eps:30, where:"YouTube'da ücretsiz", q:n=>`Extra English episode ${n}`,
-   how:["İngilizce öğrenenler için çekilmiş komik bir dizi; yavaş ve net konuşuyorlar.","<b>İngilizce altyazıyı</b> aç (Türkçe değil). Anlamadığın yerde durmak serbest.","Bitince hoşuna giden 2 cümleyi Kelime › Ekle'ye yaz ve sesli tekrar et."]},
+   how:["İngilizce öğrenenler için çekilmiş komik bir dizi; yavaş ve net konuşuyorlar.","<b>İngilizce altyazıyı</b> aç (Türkçe değil). Anlamadığın yerde durmak serbest.","Bitince hoşuna giden 2 cümleyi sesli tekrar et; birini kendi hayatına uyarlayıp söyle."]},
   {id:"friends", n:"Friends · 1. sezon", eps:24, where:"Netflix ya da HBO Max", q:n=>`Friends season 1 episode ${n}`,
-   how:["<b>İngilizce altyazıyla</b> izle. Bir bölüm yaklaşık 22 dakika.","Bir sahneyi geri sar ve karakterle birlikte söyle (gölge okuma).","Bitince 2 cümleyi Kelime › Ekle'ye yaz."]},
+   how:["<b>İngilizce altyazıyla</b> izle. Bir bölüm yaklaşık 22 dakika.","Bir sahneyi geri sar ve karakterle birlikte söyle (gölge okuma).","Bitince bir sahneyi kendi cümlelerinle anlat (1–2 cümle)."]},
   {id:"abstract", n:"Abstract: The Art of Design", eps:14, half:true, where:"Netflix", q:n=>`Abstract The Art of Design episode ${n}`,
    how:["Tasarımcıları anlatan bir belgesel: senin alanın. Bir bölüm ~45 dk, bugün yarısını izle.","<b>İngilizce altyazıyla</b> izle; tasarım terimlerini (prototype, sketch, material…) yakala.","Bitince tasarımcının fikrini İngilizce tek cümleyle yaz."]}
 ];
@@ -1281,15 +1285,21 @@ function bookItems(){
     if(have) return have; const x = open.find(y=>kind(y)===k && !Object.values(d.rid.bk).includes(y.k)); if(x){ d.rid.bk[k] = x.k; saveLocal(); } return x || null; };
   return {read: pickK("read"), voc: pickK("voc"), pron: pickK("pron")};
 }
+// Every day starts with a scene (listen → understand → use 3 phrases → meet old ones again). No word-list cards.
 function planOf(p){
-  if(p<=5) return [["cards",5]];
-  if(p<45) return [["cards",5],["gram",8],["write",5]];
-  if(p<60) return [["cards",8],["gram",10],["write",5],["read",12],["listen",10]];
-  if(p<90) return [["cards",8],["gram",10],["gramx",7],["write",5],["read",12],["listen",10],["speak",8]];
-  if(p<180) return [["cards",10,1],["gram",12,1],["gramx",8,1],["write",5,1],["brk1",5,0],["read",15,2],["listen",15,2],["speak",10,2],["chat",10,2]];
-  return [["cards",15,1],["gram",15,1],["gramx",10,1],["write",10,1],["brk1",10,0],["read",20,2],["read2",20,2],["listen",15,2],["brk2",10,0],["series",25,3],["speak",10,3],["chat",15,3],["fun",5,3]];
+  let t;
+  if(p<=5) t = [["scene",5]];
+  else if(p<45) t = [["scene",12],["gram",8]];
+  else if(p<60) t = [["scene",15],["gram",10],["read",10],["listen",10]];
+  else if(p<90) t = [["scene",15],["gram",10],["gramx",7],["read",10],["listen",10],["speak",8]];
+  else if(p<180) t = [["scene",15,1],["gram",12,1],["gramx",8,1],["write",5,1],["brk1",5,0],["read",15,2],["listen",15,2],["chat",15,2]];
+  else t = [["scene",15,1],["gram",15,1],["gramx",10,1],["write",10,1],["brk1",10,0],["read",20,2],["read2",20,2],["listen",15,2],["brk2",10,0],["series",25,3],["speak",10,3],["chat",15,3],["fun",5,3]];
+  // Sınav modu (optional): takes the place of "Cümle kur" (or Gramer+) on 45+ minute days
+  if(p>=45 && S.settings.exam && S.pack && S.pack.sent){ const i = t.findIndex(x=>x[0]==="write"), j = t.findIndex(x=>x[0]==="gramx"), k = i>=0 ? i : j;
+    if(k>=0) t[k] = ["exam", 10, t[k][2]]; else t.splice(2, 0, ["exam", 10]); }
+  return t;
 }
-const BLK = {1:"Blok 1 · Temel: kelime ve gramer", 2:"Blok 2 · Girdi: okuma ve dinleme", 3:"Blok 3 · Çıktı ve keyif"};
+const BLK = {1:"Blok 1 · Temel: sahne ve gramer", 2:"Blok 2 · Girdi: okuma ve dinleme", 3:"Blok 3 · Çıktı ve keyif"};
 function todaySteps(){
   const d = fd(), p = pace(), B = booksOn() && p>=45, g = game();
   if(!d.gplan){
@@ -1302,10 +1312,14 @@ function todaySteps(){
   const nCards = dueCards().length + Math.min(newLeftToday(), newPool().length) + Math.min(packNewLeft(), packPool().length);
   const wl = d.gplan==="new" ? L : lessonById(lastPassed()||"") || L;
   const bi = B ? bookItems() : {}, tpl = planOf(p);
-  if(B && bi.voc && p>=180){ tpl[0] = ["cards",10,1]; tpl.splice(1, 0, ["voc",5,1]); }
+  if(B && bi.voc && p>=180){ tpl[1] = ["gram",10,1]; tpl.splice(2, 0, ["voc",5,1]); }
   const steps = [];
   tpl.forEach(([k, min, blk])=>{
     let s = null;
+    if(k==="scene"){ const sc = sceneToday(), nRe = duePhrases(9).length;
+      s = {n:"Günün sahnesi", ic:"🎬", d: `${sc.ic} ${sc.t}${p<=5 ? " · sadece dinle ve anla" : ` · 3 yeni ifade${nRe ? ` + ${Math.min(nRe, p>=90?4:2)} eski ifadeyle yeniden karşılaşma` : ""}`}`, href:"#sahne", at:["#sahne"], done: stepGet("scene"),
+        todo: p<=5 ? "Önce sadece dinle, sonra 3 kısa soru. Bu kadar." : "Önce sadece dinle → 3 soruyla ne olduğunu anla → 3 ifadeyi kendi hayatına uydur (yaz ya da söyle) → eski ifadeleri yeni cümlede hatırla."}; }
+    if(k==="exam") s = {n:"Sınav modu", ic:"🎓", d:"10 eş anlamlı sorusu, cümle içinde (İTÜ tarzı)", href:"#sinav", at:["#sinav"], done: stepGet("exam"), todo:"Cümledeki renkli ifadenin yerine hangisi gelir? Seç; sonra gruptaki diğerlerini gör."};
     if(k==="cards") s = {n:"Kelime kartları", ic:"🗂️", d: nCards ? `${nCards} kart: tekrarlar ve yeni kelimeler` : "Bugünlük kart kalmadı", href:"#kelime/akis", done: !!d.cards || !nCards};
     if(k==="gram") s = {n:"Gramer dersi", ic:"🧩", d: d.gplan==="rev" ? `Tekrar: ${dueLessons().length} eski ders (kalıcı olsun diye)` : L ? `Ünite ${LESSONS.indexOf(L)+1}: ${L.t}` : "Tüm dersler bitti, serbest tekrar", href: d.gplan==="rev" ? "#gramer/tekrar" : L ? "#gramer/"+L.id : "#gramer", done: !!d.gram || d.gplan==="none",
       book: B && L && S.pack && S.pack.egiu && S.pack.egiu[LESSONS.indexOf(L)+1] ? "Kitapla pekiştirmek istersen: " + S.pack.egiu[LESSONS.indexOf(L)+1] : ""};
@@ -1313,7 +1327,7 @@ function todaySteps(){
       if(X){ const li = LESSONS.indexOf(X), pv = li>0 && lessonPassed(LESSONS[li-1].id) && GX.X[LESSONS[li-1].id]; if(pv) s.d = `"${X.t.split(":")[0]}" + bir önceki ders: hatayı düzelt, çevir, dönüştür (${GX.X[X.id].length + pv.length} soru)`; } }
     if(k==="write") s = {n:"Cümle kur", ic:"✍️", d: wl ? `"${wl.t.split(":")[0]}" ile 3 basamakta 3 cümle` : "Kendi cümlelerin", href: wl ? "#cumle/"+wl.id : "#pratik/yaz", done: !!d.ladder};
     if(k==="voc"){ const x = bi.voc; s = {n:"Kitap: kelime ünitesi", ic:"📗", d: x.l, item:x, href:"#adim/voc", manual:1,
-      how:["Ünitenin sol sayfasını oku, yeni kelimeleri sesli söyle.","Sağ sayfadaki alıştırmaları kurşun kalemle yap.","3 kelimeyi Kelime › Ekle ile kartlarına ekle."]}; }
+      how:["Ünitenin sol sayfasını oku, yeni kelimeleri sesli söyle.","Sağ sayfadaki alıştırmaları kurşun kalemle yap.","Ünitedeki 3 ifadeyle kendi hayatından birer cümle kur."]}; }
     if(k==="read" || k==="read2"){
       // an in-app reading already done today stays as it is when the books toggle changes later in the day
       const inAppDone = d.rid && d.rid[k] && (stepGet(k) || ((g.rd||{})[d.rid[k]]||{}).d===today());
@@ -1337,9 +1351,9 @@ function todaySteps(){
       s = x ? {n:"Kitap: telaffuz", ic:"🗣️", d: x.l, item:x, href:"#adim/speak", manual:1, how:["Ünitedeki kaydı YouTube'da aç (kitap adı + ünite numarasıyla ara).","Kayıtla birlikte sesli tekrar et, sonra alıştırmaları yap.","Kendini 30 saniye kaydet: Oyun › Ses kaydı."]}
             : {n:"Konuşma", ic:"🗣️", d:"Gölge okuma + 1 dakika konuşma (uygulamada, mikrofonla)", href:"#adim/speak", manual:1, at:["#pratik/konus"],
                how:["Pratik › Konuş'u aç: cümleyi dinle, aynı anda sesli tekrar et (3 cümle).","Sonra verilen konu hakkında 1 dakika konuş. Hata serbest!","Bitince buraya dön, “Bitti”ye dokun."], btns:[["🎙️ Pratik › Konuş'u aç", "#pratik/konus"]]}; }
-    if(k==="chat") s = {n:"Claude ile sohbet", ic:"💬", d:"Seviyene göre ayarlı öğretmen sohbeti: 10–15 mesaj", href:"#adim/chat", manual:1, at:["#pratik/sohbet"],
-      how:["Pratik › Sohbet'te “Serbest sohbet”i seç, hazır metni Claude'a yapıştır.","Kısa cümlelerle yaz; Claude en fazla 2 hatanı düzeltir.","Bitirirken “bitti” yaz: sana kelime listesi verir. Yeni kelimeleri Kelime › Ekle'ye yapıştır."],
-      btns:[["💬 Pratik › Sohbet'i aç", "#pratik/sohbet"]]};
+    if(k==="chat") s = {n:"Claude ile sohbet", ic:"💬", d:"Bugünkü sahneyi canlandır: 10 mesajlık rol oyunu", href:"#adim/chat", manual:1, at:["#pratik/sohbet"],
+      how:["Bugünkü sahneyi Claude'la canlandır: düğme hazır komutu açar, Claude'a yapıştır.","Kısa cümlelerle konuş; Claude konuşmayı kesmez, sonda 2–3 not verir.","Sonunda Claude'un özetini uygulamaya yapıştır: kullandığın ifadeleri sayarım."],
+      btns:[["🎬 Bugünkü sahneyi Claude'la canlandır", "#sahne/konus"],["💬 Ya da serbest sohbet (Pratik › Sohbet)", "#pratik/sohbet", 0]]};
     if(k==="brk1" || k==="brk2") s = {n:"Mola", ic:"☕", d:`${min} dakika ara: kalk, su iç, ekrandan uzaklaş`, href:"#adim/"+k, manual:1, brk:min};
     if(k==="fun") s = {n:"Keyifli kapanış", ic:"🎲", d:"Zar at ya da hata defterine bugünkü 1 hatanı yaz", href:"#adim/fun", manual:1,
       how:["Oyun sayfasında zar at: çıkan küçük görevi yap.","Ya da bugün yaptığın 1 hatayı Oyun › Hata defterine yaz (5 hata = +10 XP)."], btns:[["🎮 Oyunu aç", "#oyun"]]};
@@ -1353,7 +1367,7 @@ function todaySteps(){
       read: ()=> s.item ? "" : s.href.includes("/oku/k") || s.href.includes("/oku/u") ? "Oku (istersen sesli dinle) → alttaki soruları çöz → “Kontrol et”." : "Oku, bilmediğin en fazla 5 kelimeye dokun → alttaki “Bitti ✓”."
     };
     TODO.read2 = TODO.read;
-    s.todo = (TODO[k] && TODO[k]()) || (s.how ? s.how[0].replace(/<[^>]+>/g, "") : "");
+    s.todo = s.todo || (TODO[k] && TODO[k]()) || (s.how ? s.how[0].replace(/<[^>]+>/g, "") : "");
     s.k = k; s.min = min; s.blk = blk || 0;
     if(s.item && !s.done) s.done = stepGet(k) || !!(g.done[s.item.k] && g.done[s.item.k].d===today());
     if(s.done==null) s.done = stepGet(k);
@@ -1365,7 +1379,8 @@ function todaySteps(){
 function markStep(k, v){
   const d = fd(), st = todaySteps(), s = st.find(x=>x.k===k), f = SFLAG[k], g = game();
   if(f) d[f] = !!v;
-  else { d.st = d.st || {}; if(v){ d.st[k] = s && s.media && v===true ? {id:s.media[1], c:s.media[2]} : v; } else delete d.st[k]; }
+  if(k==="scene") d.cards = !!v;   // legacy "studied today" flag: week dots, study days, XP keep working
+  if(!f){ d.st = d.st || {}; if(v){ d.st[k] = s && s.media && v===true ? {id:s.media[1], c:s.media[2]} : v; } else delete d.st[k]; }
   if(s && s.media){ const [store, id, c] = s.media, m = media()[store]; if(v===true) m[id] = Math.max(m[id]||0, c); else if(!v && (m[id]||0)===c) m[id] = c-1; }
   if(s && s.item){ const x = s.item; if(v===true && !g.done[x.k]){ g.done[x.k] = {d:today(), xp:x.xp, l:x.l}; toast(`+${x.xp} XP ✨`); lvCheck(); }
     if(!v && g.done[x.k] && g.done[x.k].d===today()) delete g.done[x.k]; }
@@ -1476,6 +1491,261 @@ function vKontrol(m){
 function shrinkImg(file){ return new Promise(ok=>{ const r = new FileReader(); r.onload = ()=>{ const im = new Image(); im.onload = ()=>{
   const sc = Math.min(1, 1200/Math.max(im.width, im.height)), c = document.createElement("canvas"); c.width = Math.round(im.width*sc); c.height = Math.round(im.height*sc);
   c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); ok(c.toDataURL("image/jpeg", 0.72)); }; im.onerror = ()=>ok(r.result); im.src = r.result; }; r.readAsDataURL(file); }); }
+/* ================= SCENES: experience → discover → use → reconnect → speak =================
+   Original A2 scenes from a design student's life. Each scene brings 3 useful phrases; the phrases come back
+   later inside NEW sentences (spaced, adaptive) instead of word lists. Turkish is only ever behind a tap. */
+const SAHNE = [
+ {id:"kafe", t:"Yağmurlu bir gün, kafede", ic:"☕", top:"Günlük hayat", who:{A:"Barista", B:"Ece"},
+  l:[["A","Hi there! Terrible weather today, isn't it?","Merhaba! Bugün hava berbat, değil mi?"],["B","Yes, I'm completely wet! I'm in the mood for something warm.","Evet, sırılsıklamım! Canım sıcak bir şey istiyor."],["A","How about a hot chocolate? It's very popular on rainy days.","Sıcak çikolataya ne dersin? Yağmurlu günlerde çok seviliyor."],["B","Sounds perfect. Can I get a large one, please?","Harika olur. Büyük boy alabilir miyim?"],["A","Sure. For here or to go?","Tabii. Burada mı, götürmek için mi?"],["B","For here. I want to sit by the window and draw for a while.","Burada. Pencerenin yanında oturup biraz çizim yapmak istiyorum."],["A","Nice! Are you an artist?","Güzel! Sanatçı mısın?"],["B","Not really. I'm a design student. I sketch ideas everywhere.","Pek sayılmaz. Tasarım öğrencisiyim. Her yerde fikir çizerim."]],
+  q:[["Ece ne içmeye karar verdi?",["A hot chocolate","A cold lemonade","A cup of tea"],3],["Ece kafede kalacak mı?",["Yes, she'll stay.","No, she'll take it away.","She'll go home."],5],["Ece neden pencerenin yanına oturacak?",["To draw for a while","To wait for a friend","To watch the rain"],5]],
+  ph:[{id:"k1", p:"I'm in the mood for…", ex:1, k:"in the mood for", tr:"canım … istiyor", use:["Şu an canın ne istiyor? Bir şey yemek, içmek ya da yapmak.","I'm in the mood for "], re:[["It's Friday night and I'm tired. I'm ___ a movie at home.","in the mood for"],["After the long meeting, Can stood up: \"I'm ___ some fresh air.\"","in the mood for"]]},
+      {id:"k2", p:"Can I get…, please?", ex:3, k:"can i get", tr:"… alabilir miyim?", use:["En sevdiğin kafede ne sipariş edersin?","Can I get "], re:[["At the bakery: \"___ two simits, please?\"","Can I get"],["At the hotel desk: \"___ an extra towel, please?\"","Can I get"]]},
+      {id:"k3", p:"For here or to go?", ex:4, k:"for here or to go", tr:"Burada mı, götürmek için mi?", use:["Kahve alınca genelde oturur musun, alıp gider misin?","Usually, I get my coffee "], re:[["The cashier smiled: \"One sandwich. ___\" — \"To go, please. I'm late.\"","For here or to go?"],["\"Two teas, please.\" — \"Sure. ___\" — \"For here, we have time.\"","For here or to go?"]]}]},
+ {id:"bulusma", t:"Arkadaşınla buluşma, geç kalıyorsun", ic:"🚶", top:"Arkadaş sohbeti", who:{A:"Mert", B:"Ece"},
+  l:[["B","Hi Mert! Sorry, I'm running late. The bus was full.","Selam Mert! Kusura bakma, geç kalıyorum. Otobüs doluydu."],["A","No worries! I just got here too.","Dert etme! Ben de yeni geldim."],["B","I'll be there in ten minutes. Can you find a table?","On dakikaya oradayım. Bir masa bulabilir misin?"],["A","Sure. I'm at the corner table, next to the plants.","Tabii. Köşedeki masadayım, bitkilerin yanında."],["B","Finally! It's so good to see you. What have you been up to?","Sonunda! Seni görmek çok güzel. Bu aralar neler yapıyorsun?"],["A","Not much. Work, work, work. And you? How's school?","Pek bir şey yok. İş, iş, iş. Ya sen? Okul nasıl?"],["B","Busy! We have a big project this month. I'm designing a lamp.","Yoğun! Bu ay büyük bir projemiz var. Bir lamba tasarlıyorum."],["A","A lamp? That sounds fun. Show me some photos!","Lamba mı? Eğlenceli. Biraz fotoğraf göster!"]],
+  q:[["Ece neden geç kaldı?",["The bus was full.","She forgot the time.","It was raining."],0],["Mert nerede oturuyor?",["At the corner table, next to the plants","Near the door","Outside"],3],["Ece bu ay ne tasarlıyor?",["A lamp","A chair","A website"],6]],
+  ph:[{id:"b1", p:"I'm running late.", ex:0, k:"running late", tr:"geç kalıyorum", use:["En son ne zaman geç kaldın? Bir arkadaşına mesaj atar gibi yaz.","Sorry, I'm running late because "], re:[["Text to your teacher: \"I'm so sorry, I'm ___. The metro stopped.\"","running late"],["Can looked at his watch: \"We're ___! The film starts in five minutes.\"","running late"]]},
+      {id:"b2", p:"No worries!", ex:1, k:"no worries", tr:"Dert etme / sorun değil", use:["Biri senden özür diledi. Rahat bir cevap ver ve bir cümle ekle.","No worries! "], re:[["\"Oh no, I forgot your book at home!\" — \"___ Bring it tomorrow.\"","No worries!"],["\"Sorry, I took your seat.\" — \"___ I'll sit here.\"","No worries!"]]},
+      {id:"b3", p:"What have you been up to?", ex:4, k:"been up to", tr:"Bu aralar neler yapıyorsun?", use:["Uzun zamandır görmediğin biri bu soruyu sordu. Bu aralar neler yaptığını anlat.","These days, I've been "], re:[["At the reunion: \"Ayşe! I haven't seen you for years! What have you ___?\"","been up to"],["Video call with your cousin: \"So, what have you ___ this summer?\"","been up to"]]}]},
+ {id:"tasarim", t:"Derste ürün fikrini anlatmak", ic:"💡", top:"Tasarım", who:{A:"Prof. Lee", B:"Ece"},
+  l:[["A","Ece, your turn. Tell us about your project.","Ece, sıra sende. Bize projeni anlat."],["B","Okay. The idea is to make a lamp that you can fold.","Tamam. Fikir şu: katlanabilen bir lamba yapmak."],["A","Interesting. Why foldable?","İlginç. Neden katlanabilir?"],["B","Students move a lot. A foldable lamp is easy to carry.","Öğrenciler çok taşınır. Katlanan bir lambayı taşımak kolay."],["A","What is it made of?","Neyden yapılmış?"],["B","It's made of recycled paper and a thin metal frame.","Geri dönüştürülmüş kâğıttan ve ince metal bir iskeletten yapılmış."],["A","Is the paper strong enough?","Kâğıt yeterince sağlam mı?"],["B","Good question. I'm still testing it. What do you think?","İyi soru. Hâlâ test ediyorum. Siz ne düşünüyorsunuz?"],["A","I like it. Try a thicker paper and show us next week.","Beğendim. Daha kalın bir kâğıt dene, gelecek hafta göster."]],
+  q:[["Lambanın özelliği ne?",["You can fold it.","It changes color.","It works with the sun."],1],["Neden katlanabilir?",["Students move a lot.","It is cheaper.","It looks modern."],3],["Hoca gelecek hafta ne istiyor?",["A test with thicker paper","A new idea","A written report"],8]],
+  ph:[{id:"t1", p:"The idea is to…", ex:1, k:"the idea is to", tr:"Fikir şu: …", use:["Hayalindeki bir ürünü tek cümleyle anlat.","The idea is to "], re:[["At the startup meeting: \"___ deliver food by bike in 15 minutes.\"","The idea is to"],["In the workshop: \"This shelf is small. ___ save space in tiny flats.\"","The idea is to"]]},
+      {id:"t2", p:"It's made of…", ex:5, k:"made of", tr:"… -den yapılmış", use:["Yakınındaki bir eşyaya bak. Neyden yapılmış?","My desk is made of "], re:[["The seller said: \"This bag is ___ old bicycle tyres.\"","made of"],["\"Is the chair heavy?\" — \"No, it's ___ bamboo, so it's light.\"","made of"]]},
+      {id:"t3", p:"What do you think?", ex:7, k:"what do you think", tr:"Sen ne düşünüyorsun?", use:["Bir fikrini söyle ve karşındakinin görüşünü sor.","I want to "], re:[["\"I'm thinking of a red logo. ___\" — \"Hmm, maybe blue is calmer.\"","What do you think?"],["Before the trip: \"Train or bus? ___\"","What do you think?"]]}]},
+ {id:"seyahat", t:"İstasyonda yol sormak", ic:"🚆", top:"Seyahat", who:{A:"Görevli", B:"Ece", C:"Yolcu"},
+  l:[["B","Excuse me, how do I get to the city centre?","Affedersiniz, şehir merkezine nasıl giderim?"],["A","Take the blue line. It's the fastest way.","Mavi hatta bin. En hızlı yol o."],["B","Which platform does it leave from?","Hangi perondan kalkıyor?"],["A","Platform 4. Go down the stairs and turn left.","4. peron. Merdivenlerden in ve sola dön."],["B","Thanks! Do I need a ticket?","Teşekkürler! Bilet gerekiyor mu?"],["A","Yes, you can buy one from the machine over there.","Evet, şuradaki makineden alabilirsin."],["B","Excuse me, is this seat taken?","Affedersiniz, bu koltuk dolu mu?"],["C","No, go ahead.","Hayır, buyurun."]],
+  q:[["Şehir merkezine en hızlı nasıl gidilir?",["The blue line","A taxi","On foot"],1],["Tren hangi perondan kalkıyor?",["Platform 4","Platform 2","Platform 14"],3],["Bilet nereden alınır?",["From the machine","On the train","From a shop"],5]],
+  ph:[{id:"y1", p:"How do I get to…?", ex:0, k:"how do i get to", tr:"… nasıl giderim?", use:["Okuluna ya da işine nasıl gidilir? Soruyu sor, sonra cevabını yaz.","How do I get to "], re:[["A tourist in Ankara asks you: \"___ Anıtkabir?\"","How do I get to"],["In a big shopping mall: \"Sorry, ___ the cinema?\"","how do I get to"]]},
+      {id:"y2", p:"Which platform…?", ex:2, k:"which platform", tr:"Hangi peron…?", use:["Bir tren yolculuğu hayal et. Görevliye ne sorarsın?","Which platform "], re:[["Your friend is lost at the station. She texts: \"___ does the İzmir train leave from?\"","Which platform"],["\"___ do I need for Eskişehir?\" — \"Number 2, in ten minutes.\"","Which platform"]]},
+      {id:"y3", p:"Is this seat taken?", ex:6, k:"seat taken", tr:"Bu koltuk dolu mu?", use:["Kalabalık bir kafede boş bir sandalye gördün. Ne sorarsın? Bir cümle ekle.","Excuse me, is this seat taken? "], re:[["In the library, a free chair has a bag on it: \"Sorry, ___\"","is this seat taken?"],["At the concert: \"Hi! ___\" — \"No, it's free. Sit down.\"","Is this seat taken?"]]}]},
+ {id:"staj", t:"Staj görüşmesi", ic:"💼", top:"İş görüşmesi", who:{A:"Ms. Turner", B:"Ece"},
+  l:[["A","Thanks for coming, Ece. Tell me a little about yourself.","Geldiğin için teşekkürler Ece. Bana biraz kendinden bahset."],["B","Sure. I'm a third-year industrial design student, and I'm interested in furniture design.","Tabii. Endüstriyel tasarım üçüncü sınıf öğrencisiyim ve mobilya tasarımıyla ilgileniyorum."],["A","Why our studio?","Neden bizim stüdyomuz?"],["B","I love your chairs. They're simple but very comfortable.","Sandalyelerinize bayılıyorum. Sade ama çok rahatlar."],["A","Thank you. What are you good at?","Teşekkürler. Nelerde iyisin?"],["B","I'm good at sketching and 3D modelling. I'm also learning to make prototypes.","Eskiz ve 3D modellemede iyiyim. Prototip yapmayı da öğreniyorum."],["A","Great. Do you have any questions for us?","Harika. Bize sormak istediğin bir şey var mı?"],["B","Yes. Could you tell me more about a normal day here?","Evet. Burada sıradan bir günü biraz daha anlatır mısınız?"],["A","Of course. We start with a short team meeting every morning.","Tabii. Her sabah kısa bir ekip toplantısıyla başlıyoruz."]],
+  q:[["Ece hangi alanla ilgileniyor?",["Furniture design","Fashion","Car design"],1],["Ece neden bu stüdyoyu seçti?",["She loves their chairs.","It is near her home.","The salary is high."],3],["Stüdyoda gün nasıl başlıyor?",["With a short team meeting","With a test","With a lunch"],8]],
+  ph:[{id:"s1", p:"I'm interested in…", ex:1, k:"interested in", tr:"… ile ilgileniyorum", use:["Seni en çok ne ilgilendiriyor? Görüşmede söyler gibi yaz.","I'm interested in "], re:[["At a party: \"I'm ___ photography. I take my camera everywhere.\"","interested in"],["Email to a university: \"I am ___ your summer course on materials.\"","interested in"]]},
+      {id:"s2", p:"I'm good at…", ex:5, k:"good at", tr:"… -de iyiyim", use:["İyi olduğun iki şeyi söyle (okul, hobi, her şey olur).","I'm good at "], re:[["Your friend says: \"I'm ___ cooking, so I'll make dinner!\"","good at"],["The coach says: \"She's very ___ team sports.\"","good at"]]},
+      {id:"s3", p:"Could you tell me more about…?", ex:7, k:"tell me more about", tr:"… hakkında biraz daha anlatır mısınız?", use:["Merak ettiğin bir şey hakkında birine nazik bir soru sor.","Could you tell me more about "], re:[["At the gym desk: \"___ the student membership?\"","Could you tell me more about"],["In the museum: \"This sculpture is amazing. ___ the artist?\"","Could you tell me more about"]]}]},
+ {id:"restoran", t:"Arkadaşlarla restoranda", ic:"🍝", top:"Restoran", who:{A:"Garson", B:"Ece", C:"Mert"},
+  l:[["A","Good evening! Are you ready to order?","İyi akşamlar! Sipariş vermeye hazır mısınız?"],["B","Almost. What do you recommend?","Neredeyse. Ne önerirsiniz?"],["A","The mushroom pasta is very good today.","Mantarlı makarna bugün çok iyi."],["B","Then I'll have the mushroom pasta, please.","O zaman mantarlı makarna alayım lütfen."],["C","And I'll have a burger with fries.","Ben de patatesli bir burger alayım."],["A","Anything to drink?","İçecek bir şey?"],["C","Two lemonades, please.","İki limonata lütfen."],["B","That was delicious. Could we have the bill, please?","Çok lezzetliydi. Hesabı alabilir miyiz lütfen?"],["A","Of course. I'll be right back.","Tabii. Hemen geliyorum."]],
+  q:[["Garson ne öneriyor?",["The mushroom pasta","The burger","The soup"],2],["Mert ne sipariş etti?",["A burger with fries","A salad","Pasta"],4],["Yemekten sonra ne istediler?",["The bill","More bread","The menu"],7]],
+  ph:[{id:"r1", p:"Are you ready to order?", ex:0, k:"ready to order", tr:"Sipariş vermeye hazır mısınız?", use:["Garson sensin! Soruyu sor ve bir yemek öner.","Are you ready to order? Today "], re:[["The waiter came back: \"So, ___\" — \"Yes, two teas, please.\"","are you ready to order?"],["Your little brother plays 'restaurant' at home: \"Welcome! ___\"","Are you ready to order?"]]},
+      {id:"r2", p:"I'll have…", ex:3, k:"i'll have", tr:"Ben … alayım", use:["En sevdiğin yemeği sipariş et.","I'll have "], re:[["At the döner place: \"___ a small döner and an ayran, please.\"","I'll have"],["\"And for you?\" — \"Hmm… ___ the same, please.\"","I'll have"]]},
+      {id:"r3", p:"Could we have the bill, please?", ex:7, k:"the bill", tr:"Hesabı alabilir miyiz?", use:["Arkadaşlarınla yemek yedin. Hesabı iste ve kimin ödeyeceğini söyle.","Could we have the bill, please? "], re:[["After dinner, Can raised his hand: \"Excuse me, ___\"","could we have the bill, please?"],["\"It's late, let's go.\" — \"OK. Waiter! ___\"","Could we have the bill, please?"]]}]},
+ {id:"sunum", t:"Jüride proje sunmak", ic:"🎤", top:"Sunum", who:{A:"Ece", B:"Jüri"},
+  l:[["A","Good morning, everyone. Let me show you my final project.","Herkese günaydın. Size bitirme projemi göstereyim."],["A","This is a water bottle for cyclists. As you can see, you can open it with one hand.","Bu, bisikletçiler için bir su şişesi. Gördüğünüz gibi tek elle açılabiliyor."],["B","How did you test it?","Nasıl test ettin?"],["A","I gave five prototypes to cyclists and asked for feedback.","Bisikletçilere beş prototip verdim ve geri bildirim istedim."],["A","Most people liked the grip, but the cap was too small, so I made it bigger.","Çoğu kişi tutuşu sevdi ama kapak çok küçüktü, ben de büyüttüm."],["A","That's all from me. Any questions?","Benden bu kadar. Sorunuz var mı?"],["B","Yes. How much would it cost?","Evet. Kaça mal olur?"],["A","About 200 lira. I tried to keep it affordable.","Yaklaşık 200 lira. Uygun fiyatlı tutmaya çalıştım."]],
+  q:[["Ürün ne?",["A water bottle for cyclists","A bike helmet","A lunch box"],1],["Testten sonra Ece neyi değiştirdi?",["She made the cap bigger.","She changed the color.","She made it cheaper."],4],["Ürün yaklaşık kaç lira?",["About 200","About 20","About 2,000"],7]],
+  ph:[{id:"u1", p:"Let me show you…", ex:0, k:"let me show you", tr:"Size … göstereyim", use:["Telefonundaki bir fotoğrafı ya da yaptığın bir şeyi birine göster.","Let me show you "], re:[["Your mum can't use the new TV: \"___ how it works.\"","Let me show you"],["A new colleague asks where the printer is: \"___ Follow me.\"","Let me show you."]]},
+      {id:"u2", p:"As you can see,…", ex:1, k:"as you can see", tr:"Gördüğünüz gibi, …", use:["Odanı ya da masanı sunum yapar gibi anlat.","As you can see, my desk "], re:[["The teacher points at the graph: \"___ prices went up in 2025.\"","As you can see,"],["Selling an old bike online: \"___ it's in very good condition.\"","As you can see,"]]},
+      {id:"u3", p:"Any questions?", ex:5, k:"any questions", tr:"Sorunuz var mı?", use:["Arkadaşlarına cumartesi planını anlattın. Kapanış cümleni yaz.","So, that's the plan for Saturday. "], re:[["The tour guide finished: \"OK, that's the end of the tour. ___\"","Any questions?"],["After explaining the game rules: \"Easy, right? ___\"","Any questions?"]]}]},
+ {id:"parti", t:"Partide yeni biriyle tanışmak", ic:"🎉", top:"Sosyal ortam", who:{A:"Sam", B:"Ece"},
+  l:[["A","Hi! I don't think we've met. I'm Sam.","Selam! Sanırım tanışmadık. Ben Sam."],["B","Hi Sam, I'm Ece. Nice to meet you.","Selam Sam, ben Ece. Tanıştığımıza memnun oldum."],["A","Nice to meet you too. So, what do you do?","Ben de. Peki, ne iş yapıyorsun?"],["B","I'm a student. I study industrial design. What about you?","Öğrenciyim. Endüstriyel tasarım okuyorum. Ya sen?"],["A","I work as a sound engineer. How do you know Lara?","Ses mühendisi olarak çalışıyorum. Lara'yı nereden tanıyorsun?"],["B","We were in the same English class. And you?","Aynı İngilizce sınıfındaydık. Ya sen?"],["A","She's my neighbour. She makes the best cookies!","O benim komşum. En güzel kurabiyeleri o yapar!"],["B","I know! I've already eaten three.","Biliyorum! Şimdiden üç tane yedim."]],
+  q:[["Sam ne iş yapıyor?",["He's a sound engineer.","He's a teacher.","He's a student."],4],["Ece Lara'yı nereden tanıyor?",["From an English class","From work","She's her neighbour."],5],["Ece kaç kurabiye yedi?",["Three","One","None"],7]],
+  ph:[{id:"p1", p:"Nice to meet you.", ex:1, k:"nice to meet you", tr:"Tanıştığımıza memnun oldum", use:["Yeni biriyle tanış: kendini tanıt ve ona bir şey sor.","Hi, I'm "], re:[["First day at the internship: \"Hello, I'm Deniz, the new intern.\" — \"___ I'm Ali.\"","Nice to meet you."],["At the end of the call: \"It was ___, Mr. Kaya. Talk soon!\"","nice to meet you"]]},
+      {id:"p2", p:"What do you do?", ex:2, k:"what do you do", tr:"Ne iş yapıyorsun?", use:["Biri sana \"What do you do?\" diye sordu. Cevap ver ve aynı soruyu ona sor.","I'm a "], re:[["On the plane, your neighbour asks: \"So, ___\" — \"I'm an architect.\"","what do you do?"],["\"I'm Mia.\" — \"Hi Mia. ___\" — \"I'm a nurse.\"","What do you do?"]]},
+      {id:"p3", p:"How do you know…?", ex:4, k:"how do you know", tr:"… -i nereden tanıyorsun?", use:["Bir doğum gününde birini tanıyorsun. Ev sahibini nereden tanıdığını sor, kendi cevabını da yaz.","How do you know "], re:[["At the wedding: \"___ the bride?\" — \"We went to school together.\"","How do you know"],["\"Ali says hi!\" — \"Ali? ___ him?\"","How do you know"]]}]},
+ {id:"alisveris", t:"Malzeme dükkânında", ic:"🛍️", top:"Alışveriş", who:{A:"Satıcı", B:"Ece"},
+  l:[["A","Hello! Can I help you?","Merhaba! Yardımcı olabilir miyim?"],["B","Yes, I'm looking for thin wood for a model.","Evet, maket için ince ahşap arıyorum."],["A","We have balsa wood here. It's very light.","Burada balsa ağacımız var. Çok hafif."],["B","Great. Do you have it in a bigger size?","Harika. Daha büyük boyu var mı?"],["A","Yes, we have A3 sheets. They're in the back.","Evet, A3 levhalarımız var. Arka tarafta."],["B","How much is it?","Ne kadar?"],["A","45 lira per sheet. If you buy five, you get one free.","Levhası 45 lira. Beş alırsan bir tane bedava."],["B","Then I'll take five, please.","O zaman beş tane alayım lütfen."]],
+  q:[["Ece ne arıyor?",["Thin wood for a model","Paint","A new bag"],1],["Büyük levhalar nerede?",["In the back","At the door","Upstairs"],4],["Beş tane alırsa ne oluyor?",["She gets one free.","She pays less tax.","Delivery is free."],6]],
+  ph:[{id:"a1", p:"I'm looking for…", ex:1, k:"looking for", tr:"… arıyorum", use:["Bir dükkânda aradığın bir şeyi söyle.","I'm looking for "], re:[["In the library: \"Excuse me, I'm ___ a book about Bauhaus.\"","looking for"],["A lost dog on the street: \"Its owner is ___ it everywhere.\"","looking for"]]},
+      {id:"a2", p:"Do you have it in…?", ex:3, k:"do you have it in", tr:"Bunun … olanı var mı?", use:["Beğendiğin bir tişörtün rengi ya da bedeni uymadı. Satıcıya sor.","Do you have it in "], re:[["Shoe shop: \"I love these shoes. ___ size 38?\"","Do you have them in"],["Online chat with a shop: \"The lamp is nice. ___ white?\"","Do you have it in"]]},
+      {id:"a3", p:"How much is it?", ex:5, k:"how much is", tr:"Ne kadar? / Kaç para?", use:["Pazarda bir şey beğendin. Fiyatını sor, sonra pazarlık et.","How much is "], re:[["At the market: \"These tomatoes look fresh. ___?\"","How much is it"],["\"I like this poster. ___?\" — \"Only 80 lira.\"","How much is it"]]}]},
+ {id:"plan", t:"Hafta sonu planı yapmak", ic:"📅", top:"Arkadaş sohbeti", who:{A:"Lara", B:"Ece"},
+  l:[["A","Hey Ece! Are you free on Saturday?","Selam Ece! Cumartesi boş musun?"],["B","In the morning I have a class, but I'm free after two.","Sabah dersim var ama ikiden sonra boşum."],["A","How about going to the design museum? There's a new exhibition.","Tasarım müzesine gitsek? Yeni bir sergi var."],["B","Sounds good! What time should we meet?","Olur! Kaçta buluşalım?"],["A","Let's meet at three, in front of the museum.","Üçte müzenin önünde buluşalım."],["B","Perfect. Should I bring anything?","Süper. Yanımda bir şey getireyim mi?"],["A","Just your student card. It's cheaper with it.","Sadece öğrenci kartın. Onunla daha ucuz."],["B","Great. See you on Saturday!","Harika. Cumartesi görüşürüz!"]],
+  q:[["Ece cumartesi ne zaman boş?",["After two","All day","Only in the morning"],1],["Nerede buluşacaklar?",["In front of the museum","At the café","At school"],4],["Ece yanına ne almalı?",["Her student card","Money for lunch","A camera"],6]],
+  ph:[{id:"h1", p:"Are you free on…?", ex:0, k:"are you free", tr:"… boş musun?", use:["Bir arkadaşını bir şeye davet et: önce boş olup olmadığını sor.","Are you free on "], re:[["Text to your sister: \"___ tonight? Let's watch a film.\"","Are you free"],["The teacher writes: \"___ on Monday at 10? We can talk about your project.\"","Are you free"]]},
+      {id:"h2", p:"How about…?", ex:2, k:"how about", tr:"… yapsak? / … nasıl olur?", use:["Bu hafta sonu için bir şey öner.","How about "], re:[["\"I'm bored.\" — \"___ a walk by the sea?\"","How about"],["\"Where should we eat?\" — \"___ the new pizza place?\"","How about"]]},
+      {id:"h3", p:"Sounds good!", ex:3, k:"sounds good", tr:"Olur! / Kulağa iyi geliyor", use:["Bir arkadaşın plan önerdi. Kabul et ve bir ayrıntı ekle.","Sounds good! "], re:[["\"Let's meet at the station at nine.\" — \"___ See you there.\"","Sounds good!"],["Your boss: \"We can finish the report tomorrow.\" — \"___\"","Sounds good!"]]}]}
+];
+const PHR = {}; SAHNE.forEach(sc=>sc.ph.forEach(p=>{ PHR[p.id] = Object.assign({sc: sc.id}, p); }));
+const PH_INT = [1, 3, 7, 21, 60];
+function phS(){ S.ph = S.ph || {}; return S.ph; }
+function scS(){ S.sc = S.sc || {}; return S.sc; }
+function phStatus(x){ return !x ? "" : (x.box>=4 || (x.used||0)>=1 && x.box>=2) ? "use" : x.box>=2 ? "known" : "new"; }
+function sceneToday(){ const d = fd(); if(d.scene && SAHNE.find(s=>s.id===d.scene)) return SAHNE.find(s=>s.id===d.scene);
+  const done = scS(), nx = SAHNE.find(s=>!done[s.id]) || SAHNE.slice().sort((a,b)=>(done[a.id].d||"")<(done[b.id].d||"")?-1:1)[0];
+  d.scene = nx.id; saveLocal(); return nx; }
+function duePhrases(n){ const t = today(); return Object.entries(phS()).filter(([id,x])=>PHR[id] && x.due<=t && x.d0!==t).sort((a,b)=>a[1].due<b[1].due?-1:a[1].box-b[1].box).slice(0, n).map(([id])=>id); }
+// two (or three) different voices for the characters
+function sayAs(text, who, slow, onend){
+  if(!("speechSynthesis" in window)){ onend && onend(); return; }
+  const vs = speechSynthesis.getVoices().filter(v=>/^en/i.test(v.lang)), i = {A:0, B:1, C:2}[who] || 0;
+  const u = new SpeechSynthesisUtterance(text); u.lang = "en-US"; if(vs.length) u.voice = vs[i % vs.length];
+  u.pitch = vs.length>1 ? 1 : [1, 1.25, 0.8][i]; u.rate = slow ? 0.7 : (S.settings.rate || 0.9);
+  if(onend) u.onend = onend; speechSynthesis.speak(u); }
+function listenOnce(cb){ if(!SR){ toast("Bu tarayıcı sesi yazıya çeviremiyor; yazarak devam et"); return; }
+  const r = new SR(); r.lang = "en-US"; r.interimResults = false; r.onresult = e=>cb(e.results[0][0].transcript); r.onerror = ()=>toast("Duyamadım, bir daha dene ya da yaz"); r.start(); toast("🎙️ Dinliyorum…"); }
+let SCN = null;
+function scenePrompt(sc){
+  const mine = sc.ph.map(p=>p.p).join(", "), old = Object.keys(phS()).filter(id=>PHR[id] && PHR[id].sc!==sc.id).slice(-5).map(id=>PHR[id].p).join(", ");
+  return `Sen benim İngilizce konuşma partnerimsin. Seviyem yaklaşık A2; konuşma becerimi geliştirmek istiyorum.
+Şu sahneyi birlikte canlandıralım: "${sc.t}". Sen ${sc.who.A} ol, ben ${sc.who.B === "Ece" ? "kendim" : sc.who.B} olayım. Durumu biraz değiştir ki ezber olmasın.
+Kurallar:
+- Kısa ve doğal konuş (1–2 cümle), bana soru sorarak konuşmayı sürdür.
+- Hatalarımı konuşma sırasında DÜZELTME; anlamadıysan sadece tekrar sor.
+- Şu ifadeleri kullanmam için doğal fırsatlar yarat: ${mine}.${old ? ` Eski ifadelerimden birkaçını da kendin kullan: ${old}.` : ""}
+- Yaklaşık 10 mesajda ya da ben "bitti" yazınca bitir.
+Bitince Türkçe olarak: 1) İyi yaptığım 2 şey. 2) En önemli 3 hatam ve doğal hâli (kısa açıklama). 3) "KULLANDIĞIM İFADELER:" başlığıyla, yukarıdaki listeden benim kullandıklarımı yaz.
+İlk repliği sen söyle.`; }
+function scenePaste(v){ // the chat summary pasted back: phrases the learner actually used count as strong evidence
+  const part = (v.split(/KULLANDI(Ğ|G)IM İFADELER:?/i).pop() || "").toLowerCase(); let n = 0;
+  Object.keys(phS()).forEach(id=>{ const p = PHR[id]; if(p && part.includes(p.k)){ const x = phS()[id]; x.used = (x.used||0) + 1; x.box = Math.min(5, x.box+1); x.due = addDays(today(), PH_INT[Math.min(4, x.box)]); n++; } });
+  save(); toast(n ? `${n} ifadeyi konuşmada kullanmışsın 🌳` : "Kaydedildi"); }
+function vScene(m, sub){
+  if(sub==="liste"){ const done = scS();
+    m.innerHTML = `<a class="btn ghost" href="#ifade">‹ İfadeler</a><h1>Sahneler</h1><p class="sub">İstediğini seç. Bitirdiklerini tekrar dinlemek de serbest.</p>
+      ${SAHNE.map(sc=>`<a class="card lrow" href="#sahne/${sc.id}" style="text-decoration:none;color:inherit"><span style="font-size:26px">${sc.ic}</span><span style="flex:1"><b>${esc(sc.t)}</b><span class="small muted" style="display:block">${esc(sc.top)} · ${sc.ph.map(p=>esc(p.p)).join(" · ")}</span></span>${done[sc.id] ? `<span class="tag acc">✓</span>` : "›"}</a>`).join("")}`; return; }
+  if(sub==="konus"){ const sc = sceneToday(); m.innerHTML = `<a class="btn ghost" href="#bugun">‹ Bugün</a><h1>💬 ${esc(sc.t)}</h1><p class="sub">Bugünkü sahneyi Claude'la canlandır. Konuşmayı kesmez, sonda geri bildirim verir.</p><button class="btn primary block" data-rp>Komutu aç</button>`;
+    const open = ()=>bridge("Sahneyi Claude'la konuş", scenePrompt(sc), {save: scenePaste, tip:"Sohbetin sonunda Claude'un özetini buraya yapıştırırsan, kullandığın ifadeleri sayarım."});
+    m.onclick = e=>{ if(e.target.closest("[data-rp]")) open(); }; open(); return; }
+  const sc = sub && SAHNE.find(s=>s.id===sub) || sceneToday();
+  if(!SCN || SCN.id!==sc.id || SCN.day!==today()) SCN = {id:sc.id, day:today(), st:"listen", show:false, tr:{}, qi:0, a:{}, ok:0, pi:0, said:false, re:null, ri:0, rok:0, hint:false, res:null};
+  const short = pace()<=5 && !sub, lv = SAHNE.indexOf(sc)+1;
+  const head = `<div class="between"><a class="btn ghost" href="${sub ? "#sahne/liste" : "#bugun"}">‹ ${sub ? "Sahneler" : "Plan"}</a><span class="tag acc">${esc(sc.top)}</span></div>
+    <div class="tiny" style="margin-top:10px">SAHNE ${lv}/${SAHNE.length}</div><h1 style="margin-top:2px">${sc.ic} ${esc(sc.t)}</h1>`;
+  const steps = ["Dinle","Anla","Kullan","Hatırla"], si = {listen:0, disc:1, use:2, re:3, end:4}[SCN.st];
+  const dots = `<div class="row" style="gap:6px;margin:-4px 0 12px">${steps.map((s,i)=>`<span class="tag ${i===si?"acc":""}" style="${i<si?"opacity:.55":""}">${i<si?"✓ ":""}${s}</span>`).join("")}</div>`;
+  const lineHTML = (L, i, hl)=>{ const [w, en, tr] = L; let t = esc(en); if(hl) t = t.replace(esc(hl), `<b style="color:var(--accent)">${esc(hl)}</b>`);
+    return `<div class="sl" data-li="${i}" style="padding:8px 0;border-top:${i?"1px solid var(--line)":"0"}"><div class="between"><span class="tiny"><b>${esc(sc.who[w])}</b></span><span class="row" style="gap:4px"><button class="btn ghost sm" data-pl="${i}" aria-label="Bu satırı dinle">${ICON.play}</button><button class="btn ghost sm" data-tr="${i}" aria-label="Türkçesi">🇹🇷</button></span></div>
+      <div lang="en" style="${SCN.st!=="listen" || SCN.show ? "" : "filter:blur(6px);cursor:pointer;user-select:none"}" data-rv>${t}</div>${SCN.tr[i] ? `<div class="small muted">${esc(tr)}</div>` : ""}</div>`; };
+  let body = "";
+  if(SCN.st==="listen"){
+    body = `<div class="card soft small">🎧 Önce <b>sadece dinle</b>; metin bulanık. Ne olduğunu ses ve durumdan çıkar. Takılırsan satıra dokun ya da 🇹🇷'ye bas.</div>
+      <div class="row" style="margin-bottom:8px"><button class="btn primary" data-play>${ICON.play} Sahneyi dinle</button><button class="btn ghost" data-play-slow>Yavaş</button><button class="btn ghost" data-show>${SCN.show ? "Metni gizle" : "Metni göster"}</button></div>
+      <div class="card">${sc.l.map((L,i)=>lineHTML(L,i)).join("")}</div>
+      <button class="btn primary block" data-next>Dinledim → Ne oldu?</button>`;
+  }
+  if(SCN.st==="disc"){ const [q, o, ev] = sc.q[SCN.qi], ord = SCN.ord || (SCN.ord = shuffle(o.map((_,i)=>i))), pick = SCN.a[SCN.qi];
+    body = `<div class="card"><div class="tiny">${SCN.qi+1}/${sc.q.length}</div><h3 style="margin:4px 0 10px">${esc(q)}</h3>
+      <div class="stack">${ord.map(j=>{ const ok = pick!=null && j===0 && pick===0, bad = pick!=null && pick===j && j!==0;
+        return `<button class="btn block" data-qo="${j}" lang="en" style="text-align:left;${ok?"background:var(--ok-soft);border-color:var(--ok)":""}${bad?"background:var(--warn-soft);border-color:var(--warn)":""}">${esc(o[j])}</button>`; }).join("")}</div>
+      ${pick!=null && pick!==0 ? `<div class="card soft small" style="margin:10px 0 0">Bir daha dinle 🎧 Cevap bu satırda:${lineHTML(sc.l[ev], 0, "")}</div>` : ""}
+      ${pick===0 ? `<button class="btn primary block" data-qn style="margin-top:10px">${SCN.qi+1<sc.q.length ? "Sıradaki →" : short ? "Bitir →" : "İfadelere geç →"}</button>` : ""}</div>`;
+  }
+  if(SCN.st==="use"){ const p = sc.ph[SCN.pi], x = phS()[p.id], L = sc.l[p.ex], key = L[1].match(new RegExp(p.k.replace(/[.*+?^${}()|[\]\\]/g,"\\$&").replace(/'/g,"['’]"), "i"));
+    body = `<div class="card"><div class="tiny">İFADE ${SCN.pi+1}/${sc.ph.length}</div><h2 lang="en" style="margin:4px 0 8px">${esc(p.p)}</h2>
+      <div class="small muted">Sahnede şöyle geçti:</div>${lineHTML(L, 0, key ? key[0] : "")}
+      <details class="small" style="margin-top:6px"><summary>🇹🇷 Ne demek?</summary><div style="margin-top:4px">${esc(p.tr)}</div></details>
+      <div class="row" style="margin-top:10px"><button class="btn" data-say="${esc(L[1])}">${ICON.play} Dinle</button>${SR ? `<button class="btn" data-rep>🎙️ Sesli tekrar et</button>` : ""}</div>
+      ${SCN.said ? `<div class="small" style="margin-top:6px">${SCN.said}</div>` : ""}</div>
+      <div class="card"><div class="tiny">ŞİMDİ SENİN HAYATIN</div><p style="margin:4px 0 8px">${esc(p.use[0])}</p>
+      <textarea id="mine" rows="2" lang="en">${esc((SCN.draft!=null ? SCN.draft : p.use[1]))}</textarea>
+      <div class="row" style="margin-top:8px">${SR ? `<button class="btn ghost" data-mic>🎙️ Söyle</button>` : ""}<button class="btn primary" data-keep>Kaydet ve devam →</button></div>
+      ${x && x.mine && x.mine.length ? `<div class="tiny" style="margin-top:6px">Önceki cümlen: <i lang="en">${esc(x.mine.slice(-1)[0])}</i></div>` : ""}</div>`;
+  }
+  if(SCN.st==="re"){ const id = SCN.re[SCN.ri], p = PHR[id], x = phS()[id], r = SCN.res, ctx = p.re[r ? r.ci : (x.seen||0) % p.re.length];
+    body = `<div class="card"><div class="tiny">TANIDIK BİR İFADE, YENİ BİR YERDE · ${SCN.ri+1}/${SCN.re.length}</div>
+      <p lang="en" style="margin:8px 0;font-size:17px">${esc(ctx[0]).replace("___", '<span class="blank">___</span>')}</p>
+      <div class="row" style="gap:6px"><button class="btn ghost sm" data-say="${esc(ctx[0].replace("___", ctx[1]))}" ${r?"":"hidden"}>${ICON.play}</button></div>
+      <input id="rea" lang="en" autocapitalize="off" ${r?"disabled":""} value="${esc(r ? r.v : "")}" placeholder="Boşluğa ne gelir?" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--line);border-radius:10px;font:inherit;background:var(--bg);color:var(--ink)">
+      ${SCN.hint && !r ? `<div class="small muted" style="margin-top:6px">İpucu: ${esc(p.tr)} · "${esc(ctx[1].slice(0,2))}…" · ilk gördüğün yer: ${esc(SAHNE.find(s=>s.id===p.sc).t)}</div>` : ""}
+      ${r ? `<div class="card soft small" style="margin:10px 0 0">${r.ok ? `<b>Hatırladın ✓</b>` : `<b>Doğrusu:</b>`} <span lang="en">${esc(ctx[1])}</span><div class="tiny" style="margin-top:4px">${r.ok ? `Bu ifadeyle ${(x.seen||0)}. karşılaşman; bir sonraki ${PH_INT[Math.min(4,x.box)]} gün sonra.` : "Sorun değil: yarın başka bir cümlede yeniden karşına çıkacak."}</div></div>
+        <button class="btn primary block" data-rn style="margin-top:10px">${SCN.ri+1<SCN.re.length ? "Sıradaki →" : "Bitir →"}</button>`
+       : `<div class="row" style="margin-top:8px">${SR ? `<button class="btn ghost" data-rmic>🎙️</button>` : ""}<button class="btn primary" data-rc>Kontrol et</button>${SCN.hint ? "" : `<button class="btn ghost" data-hint>İpucu</button>`}</div>`}</div>`;
+  }
+  if(SCN.st==="end"){ const mine = sc.ph.map(p=>(phS()[p.id]||{}).mine).filter(Boolean).map(a=>a.slice(-1)[0]);
+    body = `<div class="card" style="text-align:center"><div style="font-size:40px">${sc.ic}</div><h2 style="margin:6px 0">Bu sahneyi anladın ✓</h2>
+      <div class="small muted">${SCN.ok}/${sc.q.length} soruyu ilk denemede bildin${SCN.re && SCN.re.length ? ` · ${SCN.rok}/${SCN.re.length} eski ifadeyi hatırladın` : ""}.</div>
+      ${short ? "" : `<div class="small" style="margin-top:8px">Yeni ifadelerin: ${sc.ph.map(p=>`<b lang="en">${esc(p.p)}</b>`).join(" · ")}</div>`}</div>
+      ${todaySteps().some(s=>s.k==="scene") ? `<button class="btn primary block" data-snext>Sıradaki adıma geç →</button>` : `<a class="btn primary block" href="#ifade">İfadelerime bak →</a>`}
+      <div class="card"><div class="tiny">İSTERSEN (BİRAZ DAHA KONUŞ)</div>
+      <button class="btn block" data-rp style="margin-top:6px">💬 Bu sahneyi Claude'la canlandır</button>
+      ${mine.length ? `<button class="btn ghost block" data-nat style="margin-top:6px">✨ Kendi cümlelerimi Claude doğallaştırsın</button>` : ""}</div>`;
+  }
+  m.innerHTML = head + dots + body;
+  const ta = $("#mine"); if(ta){ ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); ta.oninput = ()=>{ SCN.draft = ta.value; }; }
+  const ra = $("#rea"); if(ra && !SCN.res) ra.focus();
+  const redraw = ()=>vScene(m, sub);
+  m.onclick = e=>{
+    const pl = e.target.closest("[data-pl]"); if(pl){ const L = sc.l[+pl.dataset.pl]; sayAs(L[1], L[0]); return; }
+    const tr = e.target.closest("[data-tr]"); if(tr){ const i = +tr.dataset.tr; SCN.tr[i] = !SCN.tr[i]; redraw(); return; }
+    if(e.target.closest("[data-rv]")){ SCN.show = true; redraw(); return; }
+    if(e.target.closest("[data-play]") || e.target.closest("[data-play-slow]")){ const slow = !!e.target.closest("[data-play-slow]"); speechSynthesis.cancel(); let i = 0;
+      const nxt = ()=>{ m.querySelectorAll(".sl").forEach(el=>el.style.background = ""); if(i>=sc.l.length) return; const el = m.querySelector(`.sl[data-li="${i}"]`); if(el) el.style.background = "var(--fill-2)"; const L = sc.l[i++]; sayAs(L[1], L[0], slow, nxt); };
+      nxt(); logAdd("min", 1); return; }
+    if(e.target.closest("[data-show]")){ SCN.show = !SCN.show; redraw(); return; }
+    if(e.target.closest("[data-next]")){ speechSynthesis.cancel(); SCN.st = "disc"; SCN.show = false; redraw(); return; }
+    const qo = e.target.closest("[data-qo]"); if(qo && SCN.a[SCN.qi]!==0){ const j = +qo.dataset.qo; if(SCN.a[SCN.qi]==null && j===0) SCN.ok++; SCN.a[SCN.qi] = j; redraw(); return; }
+    if(e.target.closest("[data-qn]")){ SCN.ord = null; if(SCN.qi+1<sc.q.length) SCN.qi++; else { SCN.st = short ? "end" : "use"; if(short) finishScene(); } redraw(); return; }
+    if(e.target.closest("[data-rep]")){ const L = sc.ph[SCN.pi] && sc.l[sc.ph[SCN.pi].ex]; listenOnce(t=>{ const c = compare(L[1], t); SCN.said = `Duyduğum: <i lang="en">${esc(t)}</i> · ${c.pct>=70 ? "çok iyi 👏" : "iyi deneme, bir kez daha dinleyip söyle"}`; redraw(); }); return; }
+    if(e.target.closest("[data-mic]")){ listenOnce(t=>{ const el = $("#mine"); const base = el.value.trim(); el.value = (base && base!==sc.ph[SCN.pi].use[1].trim() ? base + " " : "") + t; SCN.draft = el.value; }); return; }
+    if(e.target.closest("[data-keep]")){ const p = sc.ph[SCN.pi], v = $("#mine").value.trim();
+      if(v.split(/\s+/).length < 3 || nrm(v)===nrm(p.use[1])){ toast("Cümleni biraz tamamla; kısa olabilir 🙂"); return; }
+      const x = phS()[p.id] || (phS()[p.id] = {box:0, due:addDays(today(),1), seen:0, d0:today(), sc:sc.id});
+      x.mine = (x.mine||[]).concat(v).slice(-5); x.n = (x.n||0) + 1; save();
+      if(!nrm(v).includes(p.k)) toast(`Güzel! Bir dahakine "${p.p.replace("…","")}" ifadesini de katmayı dene`);
+      SCN.draft = null; SCN.said = false;
+      if(SCN.pi+1<sc.ph.length){ SCN.pi++; } else { SCN.re = duePhrases(pace()>=90 ? 4 : 2).filter(id=>!sc.ph.some(p=>p.id===id)); SCN.st = SCN.re.length ? "re" : "end"; if(!SCN.re.length) finishScene(); }
+      redraw(); return; }
+    if(e.target.closest("[data-hint]")){ SCN.hint = true; redraw(); return; }
+    if(e.target.closest("[data-rmic]")){ listenOnce(t=>{ $("#rea").value = t; }); return; }
+    if(e.target.closest("[data-rc]")){ const id = SCN.re[SCN.ri], p = PHR[id], x = phS()[id], ci = (x.seen||0) % p.re.length, ans = p.re[ci][1], v = ($("#rea").value||"").trim();
+      if(!v){ toast("Bir tahmin yaz; yanlış olsa da olur"); return; }
+      const ok = nrm(v)===nrm(ans) || compare(ans, v).pct>=80 && norm(v).length<=norm(ans).length+1;
+      x.seen = (x.seen||0) + 1; x.last = today();
+      if(ok && !SCN.hint){ x.box = Math.min(5, x.box+1); SCN.rok++; } else if(ok){ x.box = Math.max(1, x.box); SCN.rok++; } else x.box = 0;
+      x.due = addDays(today(), ok && !SCN.hint ? PH_INT[Math.min(4, x.box)] : 1); save();
+      SCN.res = {v, ok, ci}; redraw(); return; }
+    if(e.target.closest("[data-rn]")){ SCN.res = null; SCN.hint = false; if(SCN.ri+1<SCN.re.length) SCN.ri++; else { SCN.st = "end"; finishScene(); } redraw(); return; }
+    if(e.target.closest("[data-snext]")){ advance(m, "scene"); return; }
+    if(e.target.closest("[data-rp]")){ bridge("Sahneyi Claude'la konuş", scenePrompt(sc), {save: scenePaste, tip:"Sohbetin sonunda Claude'un özetini buraya yapıştırırsan, kullandığın ifadeleri sayarım."}); return; }
+    if(e.target.closest("[data-nat]")){ const mine = sc.ph.map(p=>(phS()[p.id]||{}).mine).filter(Boolean).map(a=>a.slice(-1)[0]);
+      bridge("Cümlelerimi doğallaştır", `Ben A2 seviyesinde, konuşmamı geliştirmek isteyen bir İngilizce öğrencisiyim. Aşağıdaki cümleleri kendi hayatımdan yazdım:\n${mine.map(x=>"- "+x).join("\n")}\n\nHer cümle için: anlaşılıyorsa önce bunu söyle, sonra bir ana dili İngilizce olan kişinin aynı şeyi nasıl söyleyeceğini göster ve farkı Türkçe tek cümleyle açıkla. Kısa ve cesaretlendirici ol.`); return; }
+  };
+  function finishScene(){ const d = scS()[sc.id] || {}; scS()[sc.id] = {d: today(), n:(d.n||0)+1, ok: SCN.ok}; logAdd("min", 8); if(todaySteps().some(s=>s.k==="scene" && !s.done)) markStep("scene", true); else save(); }
+}
+/* İfadeler tab: the phrase journal (no word lists). Turkish only behind a tap. */
+function vPhr(m){
+  const P = phS(), ids = Object.keys(P).filter(id=>PHR[id]), done = scS(), nDone = SAHNE.filter(s=>done[s.id]).length;
+  const by = st => ids.filter(id=>phStatus(P[id])===st);
+  const row = id=>{ const p = PHR[id], x = P[id], sc = SAHNE.find(s=>s.id===p.sc);
+    return `<details class="lrow" style="display:block"><summary style="cursor:pointer;list-style:none"><b lang="en">${esc(p.p)}</b> <span class="tiny">${sc.ic} ${esc(sc.t)}</span>${x.mine && x.mine.length ? `<div class="small muted" lang="en"><i>“${esc(x.mine.slice(-1)[0])}”</i></div>` : ""}</summary>
+      <div class="small" style="margin-top:6px">🇹🇷 ${esc(p.tr)} · ${x.seen||0} kez yeniden karşılaştın${x.used ? ` · konuşmada ${x.used} kez kullandın` : ""} · sıradaki karşılaşma: ${x.due<=today() ? "bugün" : new Date(x.due+"T12:00:00").toLocaleDateString("tr-TR",{day:"numeric",month:"short"})}</div></details>`; };
+  const grp = (st, ic, t, note)=>{ const a = by(st); return a.length ? `<h2>${ic} ${t} <span class="tiny">${a.length}</span></h2><div class="tiny" style="margin:-6px 0 6px">${note}</div><div class="card">${a.map(row).join("")}</div>` : ""; };
+  const pk = S.pack, ex = S.ex || {}, exN = Object.keys(ex).length;
+  m.innerHTML = `<h1>İfadelerim</h1><p class="sub">Sahnelerden topladığın ifadeler. Ezber yok: her biri birkaç gün sonra başka bir cümlede kendiliğinden karşına çıkar.</p>
+    <div class="grid2" style="margin-bottom:12px"><div class="stat"><b>${nDone}/${SAHNE.length}</b><span>anladığın sahne</span></div><div class="stat"><b>${by("use").length}</b><span>kullanabildiğin ifade</span></div></div>
+    <a class="card between" href="#sahne/liste" style="text-decoration:none;color:inherit"><div><b>🎬 Sahneler</b><div class="small muted">${SAHNE.map(s=>done[s.id] ? s.ic : "·").join(" ")}</div></div>›</a>
+    ${ids.length ? grp("use","🌳","Kullanıyorum","Sohbette kullandın ya da birçok kez hatırladın.") + grp("known","🌿","Tanıdık","Birkaç kez hatırladın; aralar uzuyor.") + grp("new","🌱","Yeni","Yakında yeni bir cümlede karşına çıkacak.")
+      : `<div class="card soft small">Henüz ifaden yok. Bugün planındaki 🎬 sahneyi yapınca ilk 3 ifaden buraya gelir.</div>`}
+    <h2>🎓 Sınav modu</h2>
+    <div class="card stack">${pk && pk.sent ? `<div class="small">İTÜ tarzı eş anlamlı soruları, <b>cümle içinde</b>. Liste yok: cümledeki ifadenin yerine hangisi gelir? ${exN ? `${exN} grup başladı.` : ""}</div>
+      <a class="btn primary" href="#sinav">10 soru çöz</a>
+      <label class="small row" style="gap:8px;align-items:center"><input type="checkbox" data-exam ${S.settings.exam ? "checked" : ""}> 45 dakika ve üstü günlerde plana ekle</label>`
+      : `<div class="small">Sınav kelimeleri kurs paketinden gelir. ${pk ? "Paketin eski sürümü yüklü; yeni dosyayı bir kez daha seç (ilerlemen korunur)." : "Önce paketi yükle."}</div><a class="btn" href="#kelime">Paketi yükle / güncelle</a>`}</div>
+    <p class="tiny" style="text-align:center;margin-top:16px"><a href="#kelime" style="color:inherit">Eski kelime kartları ve kendi kelimeni ekle (isteğe bağlı)</a></p>`;
+  m.onclick = e=>{ const c = e.target.closest("[data-exam]"); if(c){ S.settings.exam = c.checked; save(); toast(c.checked ? "Uzun günlerde plana eklenecek" : "Plandan çıkarıldı"); } };
+}
+/* Sınav modu: synonym questions inside a sentence (course pack, private), spaced like the phrases */
+let EXQ = null;
+function exParse(s){ let mem = null; const html = esc(s).replace(/\{([^}|]+)(?:\|([^}]+))?\}/g, (m0, a, b)=>{ if(mem==null) mem = (b||a).trim(); return `<b style="color:var(--accent)">${a}</b>`; }); return {html, mem}; }
+function vExam(m){
+  const pk = S.pack; if(!pk || !pk.sent){ location.hash = "#ifade"; return; }
+  S.ex = S.ex || {}; const t = today(), G = pk.groups;
+  if(!EXQ || EXQ.day!==t){
+    const due = Object.entries(S.ex).filter(([g,x])=>x.due<=t).map(([g])=>+g), fresh = shuffle(G.map((_,i)=>i).filter(i=>!S.ex[i] && pk.sent[i])).slice(0, Math.max(0, 10-due.length));
+    EXQ = {day:t, q: shuffle([...due.slice(0,10), ...fresh]).slice(0,10), i:0, ok:0, pick:null, ord:null};
+  }
+  if(EXQ.i >= EXQ.q.length){ const ok = EXQ.ok, n = EXQ.q.length; EXQ = null; logAdd("min", 6);
+    if(todaySteps().some(s=>s.k==="exam") && flowNext(m, "exam")) return;
+    m.innerHTML = `<div style="text-align:center;padding-top:20px"><div style="font-size:40px">🎓</div><h1>Sınav modu tamam</h1><p class="sub">${ok}/${n} doğru. Bildiklerin daha seyrek, zorlandıkların yarın başka cümleyle gelir.</p><a class="btn primary block" href="#ifade">İfadelere dön</a></div>`; return; }
+  const g = EXQ.q[EXQ.i], grp = G[g], {html, mem} = exParse(pk.sent[g]);
+  const mm = nrm(mem||""), others = grp.en.filter(w=>nrm(w)!==mm && !mm.includes(nrm(w)) && !nrm(w).includes(mm)), right = others[0] || grp.en[0];
+  if(!EXQ.ord){ const wrong = shuffle(G.map((_,i)=>i).filter(i=>i!==g)).slice(0,3).map(i=>G[i].en[0]); EXQ.ord = shuffle([right, ...wrong]); }
+  const pick = EXQ.pick;
+  m.innerHTML = `<div class="between"><a class="btn ghost" href="#ifade">‹ İfadeler</a><span class="tag acc">${EXQ.i+1}/${EXQ.q.length}</span></div>
+    <h1 style="margin-top:8px">🎓 Sınav modu</h1>
+    <div class="card"><p lang="en" style="font-size:17px;margin:0 0 10px">${html}</p><div class="small muted">Renkli ifadenin yerine hangisi gelebilir?</div>
+    <div class="stack" style="margin-top:8px">${EXQ.ord.map(o=>{ const ok = pick!=null && o===right, bad = pick===o && o!==right;
+      return `<button class="btn block" data-eo="${esc(o)}" lang="en" style="text-align:left;${ok?"background:var(--ok-soft);border-color:var(--ok)":""}${bad?"background:var(--warn-soft);border-color:var(--warn)":""}">${esc(o)}</button>`; }).join("")}</div>
+    ${pick!=null ? `<div class="card soft small" style="margin:10px 0 0">Aynı gruptakiler: <span lang="en">${grp.en.map(esc).join(" · ")}</span><details style="margin-top:4px"><summary>🇹🇷 Anlamı</summary>${esc(grp.tr)}</details></div>
+      <button class="btn primary block" data-en style="margin-top:10px">Sıradaki →</button>` : ""}</div>`;
+  m.onclick = e=>{
+    const eo = e.target.closest("[data-eo]"); if(eo && EXQ.pick==null){ EXQ.pick = eo.dataset.eo; const ok = EXQ.pick===right, x = S.ex[g] || {box:0};
+      x.box = ok ? Math.min(5, x.box+1) : 0; x.due = addDays(today(), ok ? PH_INT[Math.min(4, x.box)] : 1); S.ex[g] = x; if(ok) EXQ.ok++; save(); vExam(m); return; }
+    if(e.target.closest("[data-en]")){ EXQ.i++; EXQ.pick = null; EXQ.ord = null; vExam(m); }
+  };
+}
+
 /* ---------- Gramer+: extra practice for a lesson (fix the mistake, translate, transform) ---------- */
 let GXS = null;
 function gxLesson(){ const d = fd(), id = d.lesson && lessonPassed(d.lesson) ? d.lesson : (lastPassed() || d.lesson); const L = lessonById(id); return L && GX.X[L.id] ? L : null; }
@@ -1843,11 +2113,11 @@ function startSyn(){
 // Approximate cumulative guided-learning hours to reach each level (Cambridge estimates): A1, A2, B1, B2, C1
 const LV_HOURS = [100, 200, 375, 550, 800];
 const PACES = {
-  20:{n:"Hafif", items:["Kelime kartları → Gramer dersi → Cümle kur (≈18 dk)"]},
-  45:{n:"Dengeli", items:["Kelime → Gramer → Cümle kur (23 dk)","Okuma: uygulamadaki sıradaki metin (12 dk)","Dinleme: seviyene göre belirli bir ders, bağlantısıyla (10 dk)"]},
-  60:{n:"Kararlı", items:["Kelime → Gramer → Gramer+ ek alıştırma → Cümle kur (30 dk)","Okuma (12 dk)","Dinleme (10 dk)","Konuşma: gölge okuma + 1 dk konuşma (8 dk)"]},
-  90:{n:"Yoğun", items:["Blok 1: Kelime, Gramer, Gramer+, Cümle kur (35 dk)","5 dk mola","Blok 2: Okuma, Dinleme, Konuşma, Claude sohbeti (50 dk)"]},
-  180:{n:"Kamp", items:["Blok 1 · Temel: Kelime, Gramer, Gramer+, Cümle kur (50 dk)","10 dk mola","Blok 2 · Girdi: 2 okuma metni + dinleme (55 dk)","10 dk mola","Blok 3 · Çıktı ve keyif: dizi bölümü, konuşma, Claude sohbeti, kapanış (55 dk)","Kitaplar yanındaysa bazı adımlar kitabın belirli sayfalarına dönüşür"]}
+  20:{n:"Hafif", items:["🎬 Günün sahnesi (12 dk) → Gramer dersi (8 dk)"]},
+  45:{n:"Dengeli", items:["🎬 Günün sahnesi → Gramer (25 dk)","Okuma: uygulamadaki sıradaki metin (10 dk)","Dinleme: seviyene göre belirli bir ders, bağlantısıyla (10 dk)"]},
+  60:{n:"Kararlı", items:["🎬 Sahne → Gramer → Gramer+ (32 dk)","Okuma (10 dk)","Dinleme (10 dk)","Konuşma: gölge okuma + 1 dk konuşma (8 dk)"]},
+  90:{n:"Yoğun", items:["Blok 1: Sahne, Gramer, Gramer+, Cümle kur (40 dk)","5 dk mola","Blok 2: Okuma, Dinleme, sahneyi Claude'la canlandırma (45 dk)"]},
+  180:{n:"Kamp", items:["Blok 1 · Temel: Sahne, Gramer, Gramer+, Cümle kur (50 dk)","10 dk mola","Blok 2 · Girdi: 2 okuma metni + dinleme (55 dk)","10 dk mola","Blok 3 · Çıktı ve keyif: dizi bölümü, konuşma, Claude sohbeti, kapanış (55 dk)","Kitaplar yanındaysa bazı adımlar kitabın belirli sayfalarına dönüşür"]}
 };
 function resting(){ return !!(S.settings.rest && S.settings.rest >= today()); }
 function basePace(){ return resting() ? 5 : (S.settings.pace || 45); }
@@ -2289,7 +2559,7 @@ function vRec(m){
 
 const TABS = [
  ["bugun","Bugün",'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>'],
- ["kelime","Kelime",'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="14" height="14" rx="3"/><path d="M7 3h11a3 3 0 0 1 3 3v11"/></svg>'],
+ ["ifade","İfadeler",'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="14" height="14" rx="3"/><path d="M7 3h11a3 3 0 0 1 3 3v11"/></svg>'],
  ["gramer","Gramer",'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 21V5M8 7h7M8 11h5"/></svg>'],
  ["pratik","Pratik",'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.8 7L4 20l1-5A8 8 0 1 1 21 12z"/></svg>'],
  ["rehber","Rehber",'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg>']
@@ -2300,12 +2570,12 @@ function render(){
   stopRec(); clearTimeout(FT); FT = null; clearInterval(BT);
   const r = route();
   const inTest = r.page==="test";
-  const tab = {ben:"rehber", kaynak:"rehber", cumle:"bugun", oyun:"rehber", adim:"bugun", gx:"gramer", kontrol:"bugun"}[r.page] || r.page;
+  const tab = {ben:"rehber", kaynak:"rehber", cumle:"bugun", oyun:"rehber", adim:"bugun", gx:"gramer", kontrol:"bugun", sahne:"bugun", kelime:"ifade", sinav:"ifade"}[r.page] || r.page;
   $("#tabbar").style.display = inTest || !S.onboarded ? "none" : "";
   $("#tabbar").innerHTML = `<nav>${TABS.map(t=>`<a href="#${t[0]}" ${t[0]===tab?'aria-current="page"':""}>${t[2]}${t[1]}</a>`).join("")}</nav>`;
   const m = $("#main"); m.onclick = null;
   if(!S.onboarded && !inTest){ m.innerHTML = vWelcome(); bindWelcome(); return; }
-  const V = {bugun:vToday, kelime:vCards, gramer:vGram, cumle:(m,s)=>vLadder(m,s), pratik:vPractice, rehber:vGuide, oyun:vGame, adim:vStep, gx:vGX, kontrol:vKontrol, kaynak:vRes, ben:vMe, test:vTest, sonuc:vResult}[r.page] || vToday;
+  const V = {bugun:vToday, kelime:vCards, gramer:vGram, cumle:(m,s)=>vLadder(m,s), pratik:vPractice, rehber:vGuide, oyun:vGame, adim:vStep, gx:vGX, kontrol:vKontrol, sahne:vScene, ifade:vPhr, sinav:vExam, kaynak:vRes, ben:vMe, test:vTest, sonuc:vResult}[r.page] || vToday;
   V(m, r.sub, r.arg); window.scrollTo(0,0);
   // "What's next" bar on every page: one tap back onto today's path
   const old = document.getElementById("nextbar"); if(old) old.remove();
@@ -2526,7 +2796,7 @@ function vToday(m){
    ${pace()>=45 && !allDone ? `<div class="small" style="margin:8px 0 2px">📕 Kitapların bugün yanında mı? <span class="row" style="display:inline-flex;gap:6px;vertical-align:middle"><button class="chip" data-books="1" aria-pressed="${booksOn()}">Evet</button><button class="chip" data-books="0" aria-pressed="${!booksOn()}">Hayır</button></span>
      <div class="tiny" style="margin-top:2px">${!booksOn() ? "Sorun değil, her şey uygulamada. Kitabı sonra yanına alırsan buradan “Evet” de; plan hemen değişir."
        : steps.some(s=>s.item) ? "Kitap adımları aşağıda 📕 / 📗 / 🗣️ “Kitap: …” diye yazıyor; sayfa numarası satırın içinde."
-       : !(S.pack && S.pack.game) ? `Kitap görevleri (hangi kitap, hangi sayfa) kurs paketinden gelir. Önce <a href="#kelime">Kelime › Kurs paketi yükle</a>; sonra burada görünürler.`
+       : !(S.pack && S.pack.game) ? `Kitap görevleri (hangi kitap, hangi sayfa) kurs paketinden gelir. Önce <a href="#kelime">İfadeler › Paketi yükle</a>; sonra burada görünürler.`
        : "Bu haftanın kitap görevleri bitmiş 🎉 Oyun sayfasından sonraki haftaya geçebilirsin."}</div></div>` : ""}
    ${(()=>{ const gs = steps.find(s=>s.k==="gram"); return gs && !allDone ? `<div class="small" style="margin:8px 0 0">🎯 Bugünün konusu: <b>${esc(gs.d)}</b></div>` : ""; })()}
    <div class="steps">${steps.map((s,i)=>`${s.blk && (i===0 || steps[i-1].blk!==s.blk) && BLK[s.blk] && steps.some(x=>x.blk>1) ? `<div class="tiny" style="margin:12px 0 0;font-weight:700;color:var(--accent)">${esc(BLK[s.blk]).toUpperCase()}</div>` : ""}<div class="sr ${i===cur?"cur":""}">
@@ -2651,7 +2921,7 @@ function vCards(m, sub){
        <div class="small muted">${pStarted} kart başladı, ${pKnown} tanesi oturdu. Eş anlamlılar gruplar halinde gelir: kartın ön yüzünde her seferinde gruptan farklı bir kelime çıkar, arkasında hepsi yazar.</div>
        <div class="between"><span class="small">Günde yeni sınav kartı</span><div class="row">${[0,3,5,8,12].map(n=>`<button class="chip" data-pp="${n}" aria-pressed="${(S.settings.packPerDay??5)===n}">${n}</button>`).join("")}</div></div>
        <a class="btn" href="#kelime/es">Eş anlamlı testi (10 soru)</a>
-       ${pk.reads && Object.values((pk.game||{}).w||{}).some(rs=>rs.some(r=>r[2]==="kurs")) ? "" : `<div class="card soft small" style="margin:0">🆕 Paketin yeni sürümünde Okuma Kitabı'nın 26 metni, takviye kitap planı, telaffuz programı ve kurs klasöründeki ek dosyalar (başlangıç, ek notlar, essay) var. Aynı dosyayı bir kez daha seç; kartlardaki ilerlemen korunur. <label class="btn sm" style="margin-top:6px">Paketi güncelle<input type="file" accept="application/json,.json" data-pack hidden></label></div>`}</div>`
+       ${pk.sent && pk.reads && Object.values((pk.game||{}).w||{}).some(rs=>rs.some(r=>r[2]==="kurs")) ? "" : `<div class="card soft small" style="margin:0">🆕 Paketin yeni sürümünde Okuma Kitabı'nın 26 metni, takviye kitap planı, telaffuz programı ve kurs klasöründeki ek dosyalar (başlangıç, ek notlar, essay) var. Aynı dosyayı bir kez daha seç; kartlardaki ilerlemen korunur. <label class="btn sm" style="margin-top:6px">Paketi güncelle<input type="file" accept="application/json,.json" data-pack hidden></label></div>`}</div>`
      : `<div class="card stack"><h3 style="margin:0">🎓 Kurs paketi yükle</h3><p class="small muted" style="margin:0">Test Atölyesi kelime listesini (1.100+ eş anlamlı kelime ve 91 phrasal verb) senin için hazırladım. Bilgisayarda düğmeye bas ve şu dosyayı seç: <b>Masaüstü › claude ile hayatı kolaylaştır › ingilizce-paket › test-atolyesi-kelime.json</b>. Bir kez yüklemen yeter; Drive eşitlemesi açıksa telefonuna da kendiliğinden geçer. Paket sadece sende kalır, sitede yayınlanmaz.</p>
        <label class="btn">Paket dosyasını seç<input type="file" accept="application/json,.json" data-pack hidden></label></div>`;
     const finished = CS && CS.total;
