@@ -829,7 +829,8 @@ function mergeState(L, R){
   return M;
 }
 const Sync = (()=>{
-  const SCOPE = "https://www.googleapis.com/auth/drive.appdata";
+  // appdata: the hidden sync file · drive.file: only files this app creates (the visible progress report for the weekly agent)
+  const SCOPE = "https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/drive.file";
   const K = KEY+":g";
   let busy = false, again = false, dirtyFlag = false, state = "off", lastAt = 0, errMsg = "", timer = null;
   const tok = ()=>{ const t = lsGet(K+"tok", null); return t && t.e > Date.now()+60e3 ? t.t : null; };
@@ -873,6 +874,16 @@ const Sync = (()=>{
     fd.append("file", new Blob([body], {type:"application/json"}));
     return (await api((fileId ? "/upload/drive/v3/files/"+fileId : "/upload/drive/v3/files")+"?uploadType=multipart&fields=id", {method:fileId?"PATCH":"POST", body:fd})).json();
   }
+  // Visible, read-only progress summary in My Drive (stats only), refreshed at most every 3 hours.
+  async function report(){
+    if(Date.now() - lsGet(K+"repAt", 0) < 3*36e5) return;
+    const body = progressReport(), id = lsGet(K+"rep", null), fd = new FormData();
+    fd.append("metadata", new Blob([JSON.stringify(id ? {} : {name:"ingilizce-defteri-ilerleme.txt", mimeType:"text/plain"})], {type:"application/json"}));
+    fd.append("file", new Blob([body], {type:"text/plain"}));
+    try{ const r = await (await api((id ? "/upload/drive/v3/files/"+id : "/upload/drive/v3/files")+"?uploadType=multipart&fields=id", {method:id?"PATCH":"POST", body:fd})).json();
+      lsSet(K+"rep", r.id); lsSet(K+"repAt", Date.now()); lsSet(K+"repErr", null); }
+    catch(e){ if(id && e && /404/.test(e.message||"")) lsSet(K+"rep", null); else lsSet(K+"repErr", (e && e.message || "").slice(0,3)); }
+  }
   async function run(){
     if(!on()) return;
     if(!tok()){ setState("auth"); return; }
@@ -889,6 +900,7 @@ const Sync = (()=>{
       if(after !== before){ S = merged; saveLocal(); applyTheme(); const a = document.activeElement; if(!a || !/^(INPUT|TEXTAREA)$/.test(a.tagName)) render(); }
       if(!remote || after !== JSON.stringify(remote) || dirtyFlag){ dirtyFlag = false; await put(JSON.stringify(S), f && f.id); }
       lastAt = Date.now(); setState("ok");
+      report().catch(()=>{});
     }catch(e){
       setState(e && e.code==="auth" ? "auth" : e && e.code==="offline" ? "offline" : "error", e && e.message || "");
     }finally{ busy = false; if(again){ again = false; setTimeout(run, 500); } }
@@ -904,7 +916,8 @@ const Sync = (()=>{
     document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="hidden"){ if(dirtyFlag) run(); } else run(); });
     window.addEventListener("online", run);
   }
-  return {on, connect, disconnect, handleRedirect, run, dirty, start, text, paint};
+  const rep = ()=>({at: lsGet(K+"repAt", 0), err: lsGet(K+"repErr", null)});
+  return {on, connect, disconnect, handleRedirect, run, dirty, start, text, paint, rep};
 })();
 
 /* ================= HELPERS ================= */
@@ -2356,6 +2369,27 @@ function mileStats(){ let sent = 0; Object.values(S.log||{}).forEach(l=>sent += 
   return {days: studyDays(), les: LESSONS.filter(l=>lessonPassed(l.id)).length, known: Object.values(S.cards).filter(c=>c.box>=3).length, sent, hrs: studiedHours()}; }
 function newMiles(){ const st = mileStats(), seen = S.miles = S.miles || {}; const got = MILES.filter(m=>m[3](st) && !seen[m[0]]); got.forEach(m=>seen[m[0]] = today()); if(got.length) save(); return got; }
 function badgesHTML(){ const seen = S.miles||{}; return `<div class="row">${MILES.map(m=>`<span class="chip" title="${esc(m[2])}" style="${seen[m[0]]?"":"opacity:.35;filter:grayscale(1)"}">${m[1]} ${esc(m[2])}</span>`).join("")}</div>`; }
+/* Plain-text progress summary written to the user's Drive for the weekly planning agent. Stats only, no sentences or names. */
+function progressReport(){
+  const t = today(), L = S.levels || {}, F = forecast(S.settings.pace||45), P = Object.values(phS()), done = scS();
+  const days = []; for(let i=27;i>=0;i--){ const d = addDays(t,-i); days.push(Math.round(dayMin(d))); }
+  const st = {new:0, known:0, use:0}; P.forEach(x=>{ const s = phStatus(x); if(st[s]!=null) st[s]++; });
+  const steps = {}; for(let i=0;i<14;i++){ const v = (S.done||{})[addDays(t,-i)]; if(v && v.st) Object.keys(v.st).forEach(k=>steps[k] = (steps[k]||0)+1); if(v && v.gram) steps.gram = (steps.gram||0)+1; }
+  const passed = LESSONS.filter(l=>lessonPassed(l.id)).length, b2 = F.rows.find(r=>r.i===3) || {};
+  const exs = Object.values(S.ex||{}), mood = []; for(let i=0;i<14;i++){ const v = (S.done||{})[addDays(t,-i)]; if(v && v.mood) mood.push(v.mood); }
+  const data = {rapor: t, surum: "app", seviye: Object.fromEntries(Object.entries(L).map(([k,v])=>[k, v<0 ? "<A1" : LV[v]])), seviyeInce: S.levelsF||null, testTarihi: S.testDate||null,
+    hedef: S.target || {date:"2027-06-01", lv:"B2"}, secilenSure: S.settings.pace||45, toplamSaat: Math.round(totalHours()), calisilanSaat: Math.round(studiedHours()*10)/10,
+    son28GunDakika: days, son7GunOrt: Math.round(days.slice(-7).reduce((a,b)=>a+b,0)/7), son28GunOrt: Math.round(days.reduce((a,b)=>a+b,0)/28), calismaGunuToplam: studyDays(),
+    b2Tahmin: b2.dAll!=null ? dateIn(b2.dAll) : null, b2KalanSaat: b2.hLeft!=null ? Math.round(b2.hLeft) : null,
+    ifadeler: Object.assign({toplam: P.length, konusmadaKullanilan: P.filter(x=>(x.used||0)>0).length, oturan: P.filter(x=>x.box>=5).length, bugunTekrarBekleyen: duePhrases(9999).length}, st),
+    sahneler: {toplam: SAHNE.length, eklenen: SAHNE.filter(s=>s.c).length, biten: SAHNE.filter(s=>done[s.id]).length}, fren: (S.done[t]||{}).brake ?? null,
+    gramerDersiGecilen: passed + "/" + LESSONS.length, sinavGrubu: exs.length, son14GunAdimSayilari: steps, ruhHali14: mood,
+    dizi: media().ser, dinleme: media().lis};
+  return `İngilizce Defteri · ilerleme özeti (${t})\nBu dosyayı uygulama kendisi yazar; sadece istatistik içerir. Haftalık plan ajanı okur.\n\n` +
+    `Seviye: ${Object.entries(data.seviye).map(([k,v])=>k+" "+v).join(", ")}\nHedef: Haziran 2027 B2 · B2 tahmini: ${data.b2Tahmin||"-"} · kalan ${data.b2KalanSaat??"-"} saat\n` +
+    `Son 7 gün ort. ${data.son7GunOrt} dk/gün · son 28 gün ort. ${data.son28GunOrt} dk/gün · seçilen süre ${data.secilenSure} dk\n` +
+    `İfadeler: ${P.length} (yeni ${st.new}, tanıdık ${st.known}, kullanıyor ${st.use}, oturan ${data.ifadeler.oturan}) · bekleyen tekrar ${data.ifadeler.bugunTekrarBekleyen}\n` +
+    `Sahneler: ${data.sahneler.biten}/${data.sahneler.toplam} bitti · Gramer: ${data.gramerDersiGecilen}\n\nJSON:\n${JSON.stringify(data)}\n`; }
 function studyDays(){ const s = new Set(); Object.entries(S.done||{}).forEach(([d,v])=>{ if(v && (v.cards||v.gram||v.ladder||v.main||v.write)) s.add(d); }); Object.entries(S.log||{}).forEach(([d,v])=>{ if(v && ((v.min||0)>=2 || v.ext || v.cards)) s.add(d); }); return s.size; }
 function whyLine(){ const g = (S.goals || GOALS.map(x=>x.k)).map(k=>GOALS.find(x=>x.k===k)).filter(Boolean); if(!g.length) return ""; const x = g[new Date().getDate() % g.length]; return `${x.i} Neden buradasın: <b>${esc(x.n)}</b>`; }
 function levelProgress(){ const H = totalHours(), i = LV_HOURS.findIndex(h=>h>H); if(i<0) return null; const lo = i ? LV_HOURS[i-1] : 0;
@@ -3444,6 +3478,8 @@ function vMe(m){
   <h2>Verilerim</h2>
   <div class="card stack"><div class="between" style="align-items:flex-start"><div><h3 style="margin:0">☁️ Google Drive eşitlemesi</h3><div class="small muted" data-sync-text>${esc(Sync.text())}</div></div></div>
    <p class="small muted" style="margin:0">İlerlemen kendi Google Drive'ında, sadece bu uygulamanın görebildiği gizli bir klasörde saklanır. Telefonda ve bilgisayarda aynı Google hesabıyla bağlan; ikisi de aynı verileri görür. Bir cihazda internet yoksa, bağlanınca kendiliğinden eşitlenir.</p>
+   ${Sync.on() ? (()=>{ const r = Sync.rep(); return `<div class="small">${r.err ? `📊 Haftalık plan ajanı ilerlemeni göremiyor. Bir kez yeniden bağlan (yeni izin: sadece bu uygulamanın oluşturduğu dosya). <button class="btn sm" data-gconnect>Yeniden bağlan</button>`
+     : r.at ? `📊 Haftalık plan ajanı için özet rapor Drive'ında: <i>ingilizce-defteri-ilerleme.txt</i> · ${new Date(r.at).toLocaleString("tr-TR",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}` : `📊 Özet rapor ilk eşitlemede Drive'ına yazılacak.`}</div>`; })() : ""}
    <div class="row">${Sync.on() ? `<button class="btn" data-sync>Şimdi eşitle</button><button class="btn ghost" data-unsync>Bağlantıyı kes</button>` : `<button class="btn primary" data-gconnect>Google Drive'a bağlan</button>`}</div></div>
   <div class="card stack"><p class="small muted" style="margin:0">Ek güvence: ara sıra yedek dosyası indirebilirsin.</p>
    <div class="row"><button class="btn" data-exp>Yedeği indir</button><label class="btn">Yedekten yükle<input type="file" accept="application/json" data-imp hidden></label></div>
