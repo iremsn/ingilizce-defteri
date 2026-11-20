@@ -1387,6 +1387,9 @@ function markStep(k, v){
   const d = fd(), st = todaySteps(), s = st.find(x=>x.k===k), f = SFLAG[k], g = game();
   if(f) d[f] = !!v;
   if(k==="scene") d.cards = !!v;   // legacy "studied today" flag: week dots, study days, XP keep working
+  // steps done outside the app (series, listening, Claude chat, book pages) count toward study hours when ticked
+  if(s && s.min && (["series","listen","chat","fun"].includes(k) || s.item)){ d.xm = d.xm || {};
+    if(v && !d.xm[k]){ d.xm[k] = s.min; logAdd("ext", s.min); } else if(!v && d.xm[k]){ logAdd("ext", -d.xm[k]); delete d.xm[k]; } }
   if(!f){ d.st = d.st || {}; if(v){ d.st[k] = s && s.media && v===true ? {id:s.media[1], c:s.media[2]} : v; } else delete d.st[k]; }
   if(s && s.media){ const [store, id, c] = s.media, m = media()[store]; if(v===true) m[id] = Math.max(m[id]||0, c); else if(!v && (m[id]||0)===c) m[id] = c-1; }
   if(s && s.item){ const x = s.item; if(v===true && !g.done[x.k]){ g.done[x.k] = {d:today(), xp:x.xp, l:x.l}; toast(`+${x.xp} XP ✨`); lvCheck(); }
@@ -2305,6 +2308,19 @@ function forecast(planMin){
   });
   return {real: real!=null ? Math.round(real) : null, active, span, trend, lessons28, H, per, planMin, rows};
 }
+/* Target: abroad internship by June 2027 → B2 (B1+ with confident speaking is the minimum). */
+function goalHTML(){ const g = S.target || {date:"2027-06-01", lv:3}, left = Math.round((new Date(g.date+"T12:00:00") - new Date(today()+"T12:00:00"))/864e5);
+  if(left<=0) return "";
+  const F = forecast(S.settings.pace||45), r = F.rows.find(x=>x.i===g.lv), b1 = F.rows.find(x=>x.i===g.lv-1);
+  if(!r || r.done) return `<div class="card soft small">🎯 Hedef ${LVN[g.lv]} saatlerine ulaştın 🎉 Şimdi konuşma pratiğine ağırlık ver.</div>`;
+  const need = Math.ceil(r.hLeft*60/left), per = Math.round(F.per), ok = r.dAll<=left, near = !ok && per>=need*0.8;
+  const msg = ok ? `Bu hızla yetişiyorsun 🌱 Tahmin: ${dateIn(r.dAll)}.`
+    : near ? `Çok az kaldı. Hafta sonları biraz uzun çalışırsan yetişir.`
+    : `Şu hızla ${LVN[g.lv]}: ${dateIn(r.dAll)}${b1 && !b1.done && b1.dAll<=left ? `; Haziran'da ${LVN[g.lv-1]} olursun` : ""}. Yetişmek için: hafta içi 90 dk, hafta sonu 180 dk.`;
+  return `<div class="card"><div class="between"><b>🎯 Haziran 2027 · yurt dışı staj</b><span class="tag acc">${left} gün</span></div>
+    <div class="small" style="margin-top:6px">Hedef <b>${LVN[g.lv]}</b>: ${Math.round(r.hLeft)} saat kaldı → günde ortalama <b>${need} dk</b>. Senin ortalaman: <b>${per} dk</b>${F.real==null ? " (seçtiğin süre; gerçek veri birkaç gün sonra)" : ""}.</div>
+    <div class="small" style="margin-top:4px">${msg}</div>
+    <div class="tiny" style="margin-top:4px">Saat tek başına konuşma getirmez: haftada 1 konuşma dersi + her gün sahne. Kitap ve dizi adımlarını işaretle ki saatlerin sayılsın.</div></div>`; }
 function forecastHTML(planMin, compact){
   const F = forecast(planMin), next = F.rows.find(r=>!r.done) || F.rows[2], b2 = F.rows[1];
   const show = compact ? [...new Set([next, b2])].filter(r=>!r.done) : F.rows.filter(r=>!r.done);
@@ -2895,6 +2911,7 @@ function vToday(m){
   ${(()=>{ const mo = MOODS.find(x=>x[0]===d.mood), av = AVAIL.find(x=>x[0]===d.avail);
     const body = moodCard() + `<div class="card" style="margin-top:-6px"><div class="small" style="margin-bottom:6px"><b>Bugün ne kadar vaktin var?</b> <span class="tiny">Plan buna göre kısalır ya da uzar.</span></div><div class="row">${AVAIL.map(([n,l])=>`<button class="chip" data-avail="${n}" aria-pressed="${pace()===n}">${l}</button>`).join("")}</div></div>`;
     return (mo || av) && !allDone ? `<details><summary class="small muted" style="margin:0 0 10px;cursor:pointer">${mo?mo[1]:"🙂"} · ${av?av[1]:pace()+" dk"} · <u>değiştir</u></summary>${body}</details>` : allDone ? "" : body; })()}
+  ${goalHTML()}
   <div class="card" style="border:2px solid var(--accent)"><div class="between"><h3 style="margin:0">📘 Bugünkü planın</h3><span class="tag acc">${allDone?"bitti ✓":`adım ${cur+1}/${steps.length}`}</span></div>
    ${pace()>=45 && !allDone ? `<div class="small" style="margin:8px 0 2px">📕 Kitapların bugün yanında mı? <span class="row" style="display:inline-flex;gap:6px;vertical-align:middle"><button class="chip" data-books="1" aria-pressed="${booksOn()}">Evet</button><button class="chip" data-books="0" aria-pressed="${!booksOn()}">Hayır</button></span>
      <div class="tiny" style="margin-top:2px">${!booksOn() ? "Sorun değil, her şey uygulamada. Kitabı sonra yanına alırsan buradan “Evet” de; plan hemen değişir."
