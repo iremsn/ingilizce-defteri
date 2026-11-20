@@ -2889,6 +2889,7 @@ function vTest(m){
   }
   m.onclick = e=>{
     if(e.target.closest("[data-quit]")){ T = null; return; }
+    if(!T){ vTest(m); return; }   // test state was reset while the page stayed open
     if(e.target.closest("[data-next]")){ T.i++; vTest(m); return; }
     const o = e.target.closest("[data-k]");
     if(o){ const k = +o.dataset.k; T.ans[T.i] = k===it.a ? 1 : k<0 ? 0 : -1; ev("pt", it.sec+":"+it.lv, T.ans[T.i]); T.i++; vTest(m); return; }   // 1 right · 0 "Bilmiyorum" · -1 wrong
@@ -2920,6 +2921,15 @@ function finishTest(){
   save(); T = null; location.hash = "#sonuc";
 }
 
+/* EF SET: free 50-min CEFR test (reading + listening) with a certificate; its result can be entered any time. */
+function efsetHTML(){ const last = (S.history||[]).filter(h=>h.src==="efset").slice(-1)[0];
+  return `<div class="card soft small"><b>🎓 Daha kesin ölçüm: EF SET</b><div style="margin-top:4px">Bu uygulamanın testinde kelime ve gramer için seviye başına 4 soru var (en fazla 1 seviye sapar); okuma ve dinlemede 2 soru var (±1 seviye). Ücretsiz <a href="https://www.efset.org/" target="_blank" rel="noopener">EF SET</a> 50 dk sürer, okuma + dinlemeyi ölçer ve staj başvurusunda gösterebileceğin bir sertifika verir. Sonucunu buraya gir:</div>
+   <div class="row" style="margin-top:8px;gap:6px;flex-wrap:wrap">Okuma <select id="efr"><option value="">–</option>${LV.map((l,i)=>`<option value="${i}">${l}</option>`).join("")}</select> Dinleme <select id="efl"><option value="">–</option>${LV.map((l,i)=>`<option value="${i}">${l}</option>`).join("")}</select><button class="btn sm" data-efsave>Kaydet</button></div>
+   <div class="tiny" style="margin-top:4px">${last ? `Son EF SET kaydın: ${new Date(last.date+"T12:00:00").toLocaleDateString("tr-TR",{day:"numeric",month:"long"})} · okuma ${LV[last.levels.reading]||"–"}, dinleme ${LV[last.levels.listening]||"–"}. ` : ""}6–8 haftada bir tekrarla, farkı görürsün.</div></div>`; }
+document.addEventListener("click", e=>{ if(!e.target.closest("[data-efsave]")) return;
+  let n = 0; S.levels = S.levels || {vocab:-1,grammar:-1,reading:-1,listening:-1,writing:-1,speaking:-1};
+  [["efr","reading"],["efl","listening"]].forEach(([id,k])=>{ const el = $("#"+id), v = el ? el.value : ""; if(v!==""){ S.levels[k] = +v; S.levelsF = S.levelsF||{}; S.levelsF[k] = +v + 0.5; n++; } });
+  if(!n){ toast("Önce seviye seç"); return; } S.history = S.history || []; S.history.push({date:today(), levels:Object.assign({}, S.levels), src:"efset"}); ev("efset", "", n); save(); toast("EF SET sonucun kaydedildi ✓"); render(); });
 /* ================= RESULT ================= */
 function levelRows(){
   return Object.keys(SK).map(k=>{ const lv=lvOf(k), w=workOf(k);
@@ -2939,11 +2949,7 @@ function vResult(m){
    <textarea id="pw" rows="4" lang="en" placeholder="My name is ..."></textarea>
    <div class="row" style="margin-top:8px"><button class="btn" id="pwb">Claude'a değerlendirt</button></div></div>
   <a class="btn primary block" href="#bugun">Planıma git</a>
-  <div class="card soft small"><b>Bu test ne kadar hassas?</b> Kelime ve gramerde seviye başına 4 soru var; sonuç genelde doğru, en fazla 1 seviye sapar. Okuma ve dinlemede seviye başına 2 soru var; ±1 seviye olabilir. Daha kesin sonuç için ücretsiz <a href="https://www.efset.org/" target="_blank" rel="noopener">EF SET</a> (50 dk, okuma + dinleme, staj başvurusunda gösterilebilir sertifika) yap ve sonucunu buraya gir:
-   <div class="row" style="margin-top:8px;gap:6px;flex-wrap:wrap">Okuma <select id="efr"><option value="">–</option>${LV.map((l,i)=>`<option value="${i}">${l}</option>`).join("")}</select> Dinleme <select id="efl"><option value="">–</option>${LV.map((l,i)=>`<option value="${i}">${l}</option>`).join("")}</select><button class="btn sm" id="efb">Kaydet</button></div>
-   <div class="tiny" style="margin-top:4px">6–8 hafta sonra buradaki testi tekrarla, farkı görürsün.</div></div>`;
-  $("#efb").onclick = ()=>{ let n = 0; [["efr","reading"],["efl","listening"]].forEach(([id,k])=>{ const v = $("#"+id).value; if(v!==""){ S.levels[k] = +v; S.levelsF = S.levelsF||{}; S.levelsF[k] = +v + 0.5; n++; } });
-    if(!n){ toast("Önce seviye seç"); return; } S.history.push({date:today(), levels:Object.assign({}, S.levels), src:"efset"}); save(); toast("EF SET sonucun kaydedildi ✓"); vResult($("#main")); };
+  ${efsetHTML()}`;
   $("#pwb").onclick = ()=>{ const t=$("#pw").value.trim(); if(!t){ toast("Önce birkaç cümle yaz"); return; } bridge("Yazma seviyeni ölç", P.placement(t)); };
 }
 
@@ -3044,7 +3050,7 @@ function vToday(m){
   ${(()=>{ const n = Sync.noteGet(); if(!n.txt) return "";
     return `<details class="card" ${n.isNew ? "open" : ""} data-note><summary style="cursor:pointer"><b>💬 Haftalık notun</b>${n.isNew ? ` <span class="tag acc">yeni</span>` : ""}<div class="tiny">Senin verilerine bakılarak yazıldı</div></summary>
       <div class="small" style="white-space:pre-wrap;margin-top:8px">${esc(n.txt)}</div>${n.isNew ? `<button class="btn ghost sm" data-noteok style="margin-top:8px">Okudum ✓</button>` : ""}</details>`; })()}
-  ${S.levels && !S.levelsF && S.testDate ? `<div class="card soft small">🧭 Seviye testin eski puanlamayla hesaplandı (şansla tutan cevaplar seviye atlatıyordu). Hedef tahmini doğru olsun diye testi bir kez daha çöz, yaklaşık 15 dk. <a class="btn sm" href="#test">Testi çöz</a></div>` : ""}
+  ${S.levels && !S.levelsF && S.testDate ? `<div class="card soft small">🧭 Seviye testin eski puanlamayla hesaplandı (şansla tutan cevaplar seviye atlatıyordu). Hedef tahmini doğru olsun diye testi bir kez daha çöz, yaklaşık 15 dk. <a class="btn sm" href="#test">Testi çöz</a> <a class="btn ghost sm" href="#ben">EF SET sonucu gir</a></div>` : ""}
   ${goalHTML()}
   <div class="card" style="border:2px solid var(--accent)"><div class="between"><h3 style="margin:0">📘 Bugünkü planın</h3><span class="tag acc">${allDone?"bitti ✓":`adım ${cur+1}/${steps.length}`}</span></div>
    ${pace()>=45 && !allDone ? `<div class="small" style="margin:8px 0 2px">📕 Kitapların bugün yanında mı? <span class="row" style="display:inline-flex;gap:6px;vertical-align:middle"><button class="chip" data-books="1" aria-pressed="${booksOn()}">Evet</button><button class="chip" data-books="0" aria-pressed="${!booksOn()}">Hayır</button></span>
@@ -3554,13 +3560,14 @@ function vRes(m){
 
 /* ================= ME / LEVELS ================= */
 function vMe(m){
-  const days = Object.values(S.done).filter(d=>d.cards||d.main).length;
-  const known = Object.values(S.cards).filter(c=>c.box>=4).length;
+  const days = studyDays();
+  const known = Object.values(S.cards).filter(c=>c.box>=4).length + Object.values(S.ph||{}).filter(x=>x.box>=2).length;
   const since = S.testDate ? Math.floor((new Date(today())-new Date(S.testDate))/864e5) : null;
   m.innerHTML = `<h1>Seviyem</h1><p class="sub">${S.testDate ? `Son ölçüm: ${new Date(S.testDate+"T12:00:00").toLocaleDateString("tr-TR",{day:"numeric",month:"long",year:"numeric"})}` : "Henüz seviye testi yapmadın."}</p>
   <div class="card">${levelRows()}<div class="tiny" style="margin-top:8px">Dolu: geçtiğin seviye · Çizgili: çalıştığın seviye</div></div>
   ${since!==null && since>=42 ? `<div class="card soft small">İlk ölçümden bu yana ${Math.floor(since/7)} hafta geçti. Testi tekrarlayıp ilerlemeni görmenin zamanı.</div>`:""}
   <a class="btn ${S.testDate?"":"primary"} block" href="#test">${S.testDate?"Seviye testini tekrarla":"Seviye testine başla"}</a>
+  ${efsetHTML()}
   <h2>İlerleme</h2>
   <div class="grid2"><div class="stat"><b>${days}</b><span>çalıştığın gün</span></div><div class="stat"><b>${known}</b><span>iyi bildiğin kelime</span></div>
   <div class="stat"><b>${S.journal.length}</b><span>yazı ve konuşma</span></div><div class="stat"><b>${S.grammarDone.length}</b><span>gramer konusu</span></div></div>
