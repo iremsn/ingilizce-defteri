@@ -804,6 +804,7 @@ function mergeState(L, R){
   ["ph","ex"].forEach(f=>{ if(!R[f]) return; M[f] = M[f] || {}; Object.entries(R[f]).forEach(([k,b])=>{ const a = M[f][k];
     if(!a || (b.seen||0)+(b.used||0) > (a.seen||0)+(a.used||0) || ((b.seen||0)===(a.seen||0) && (b.due||"") > (a.due||""))) M[f][k] = Object.assign({}, b, a && a.mine && !b.mine ? {mine:a.mine} : {}); }); });
   if(R.sc){ M.sc = M.sc || {}; Object.entries(R.sc).forEach(([k,b])=>{ const a = M.sc[k]; if(!a || (b.d||"") > (a.d||"")) M.sc[k] = b; }); }
+  if(R.ev){ const seen = new Set(), all = [...(L.ev||[]), ...R.ev].filter(e=>{ const k = e.join("|"); if(seen.has(k)) return false; seen.add(k); return true; }).sort((a,b)=>a[0]-b[0]); M.ev = all.slice(-3000); }
   M.custDel = [...new Set([...(L.custDel||[]), ...(R.custDel||[])])];
   M.custSc = byKey([...(L.custSc||[]), ...(R.custSc||[])], c=>c.id).filter(c=>!M.custDel.includes(c.id));
   M.grammarDone = [...new Set([...(L.grammarDone||[]), ...(R.grammarDone||[])])];
@@ -1220,6 +1221,12 @@ function nextLesson(){
 }
 function lastPassed(){ const e = Object.entries(gr().done).filter(([id,d])=>d.pass && lessonById(id)).sort((a,b)=>a[1].date<b[1].date?1:-1)[0]; return e ? e[0] : null; }
 function dueLessons(){ const t = today(); return Object.entries(gr().done).filter(([id,d])=>d.pass && d.due<=t && lessonById(id)).map(([id])=>id); }
+/* Learning-behaviour log for the weekly analysis: [unix sec, type, key, value]. Kept small (last 3000), synced with the rest.
+   v page view · st step tick · skip · rv review (±seconds) · hint · sq scene question · use own sentence (±words)
+   g grammar answer (1/0 idk/-1) · gl lesson score · ex exam answer · pt placement answer */
+function ev(type, a, b){ if(!S) return; const E = S.ev = S.ev || [], now = Math.round(Date.now()/1000), last = E[E.length-1];
+  if(type==="v" && last && last[1]==="v" && last[2]===a && now-last[0]<60) return;
+  E.push(b==null ? [now, type, a==null ? "" : a] : [now, type, a==null ? "" : a, b]); if(E.length>3000) E.splice(0, E.length-3000); }
 function logAdd(k, n){ const t = today(); S.log = S.log || {}; const o = S.log[t] = S.log[t] || {}; o[k] = (o[k]||0) + (n==null?1:n); }
 const nrm = s => String(s).toLowerCase().replace(/[’`]/g,"'").replace(/[.?!,;:"]/g,"").replace(/\s+/g," ").trim();
 function shuffle(a){ a = a.slice(); for(let i=a.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [a[i],a[j]] = [a[j],a[i]]; } return a; }
@@ -1399,6 +1406,7 @@ function todaySteps(){
 function markStep(k, v){
   const d = fd(), st = todaySteps(), s = st.find(x=>x.k===k), f = SFLAG[k], g = game();
   if(f) d[f] = !!v;
+  ev("st", k, v ? 1 : 0);
   if(k==="scene") d.cards = !!v;   // legacy "studied today" flag: week dots, study days, XP keep working
   // steps done outside the app (series, listening, Claude chat, book pages) count toward study hours when ticked
   if(s && s.min && (["series","listen","chat","fun"].includes(k) || s.item)){ d.xm = d.xm || {};
@@ -1462,7 +1470,7 @@ function vStep(m, k){
   m.onclick = e=>{
     if(proofClick(e, k, ()=>s.item.l, ()=>vStep(m, k))) return;
     if(e.target.closest("[data-sdone]")){ clearInterval(BT); if(!flowNext(m, k)) advance(m, k); return; }
-    if(e.target.closest("[data-sskip]")){ e.preventDefault(); clearInterval(BT); flowNext(m, k, "skip"); }
+    if(e.target.closest("[data-sskip]")){ e.preventDefault(); clearInterval(BT); ev("skip", k); flowNext(m, k, "skip"); }
   };
 }
 /* 📸 Proof box: add screenshots / photos of solved book pages, then a ready prompt to have Claude or ChatGPT check them.
@@ -1772,7 +1780,7 @@ function vScene(m, sub){
   }
   m.innerHTML = head + dots + body;
   const ta = $("#mine"); if(ta){ ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); ta.oninput = ()=>{ SCN.draft = ta.value; }; }
-  const ra = $("#rea"); if(ra && !SCN.res) ra.focus();
+  const ra = $("#rea"); if(ra && !SCN.res){ ra.focus(); if(!SCN.t0) SCN.t0 = Date.now(); }
   const redraw = ()=>vScene(m, sub0);
   m.onclick = e=>{
     const pl = e.target.closest("[data-pl]"); if(pl){ const L = sc.l[+pl.dataset.pl]; sayAs(L[1], L[0]); return; }
@@ -1783,28 +1791,29 @@ function vScene(m, sub){
       nxt(); logAdd("min", 1); return; }
     if(e.target.closest("[data-show]")){ SCN.show = !SCN.show; redraw(); return; }
     if(e.target.closest("[data-next]")){ speechSynthesis.cancel(); SCN.st = "disc"; SCN.show = false; redraw(); return; }
-    const qo = e.target.closest("[data-qo]"); if(qo && SCN.a[SCN.qi]!==0){ const j = +qo.dataset.qo; if(SCN.a[SCN.qi]==null && j===0) SCN.ok++; SCN.a[SCN.qi] = j; redraw(); return; }
+    const qo = e.target.closest("[data-qo]"); if(qo && SCN.a[SCN.qi]!==0){ const j = +qo.dataset.qo; if(SCN.a[SCN.qi]==null){ if(j===0) SCN.ok++; ev("sq", sc.id+":"+SCN.qi, j===0 ? 1 : -1); } SCN.a[SCN.qi] = j; redraw(); return; }
     if(e.target.closest("[data-qn]")){ SCN.ord = null; if(SCN.qi+1<sc.q.length) SCN.qi++; else { SCN.st = short ? "end" : "use"; if(short) finishScene(); } redraw(); return; }
     if(e.target.closest("[data-rep]")){ const L = sc.ph[SCN.pi] && sc.l[sc.ph[SCN.pi].ex]; listenOnce(t=>{ const c = compare(L[1], t); SCN.said = `Duyduğum: <i lang="en">${esc(t)}</i> · ${c.pct>=70 ? "çok iyi 👏" : "iyi deneme, bir kez daha dinleyip söyle"}`; redraw(); }); return; }
     if(e.target.closest("[data-mic]")){ listenOnce(t=>{ const el = $("#mine"); const base = el.value.trim(); el.value = (base && base!==sc.ph[SCN.pi].use[1].trim() ? base + " " : "") + t; SCN.draft = el.value; }); return; }
     if(e.target.closest("[data-keep]")){ const p = sc.ph[SCN.pi], v = $("#mine").value.trim();
       if(v.split(/\s+/).length < 3 || nrm(v)===nrm(p.use[1])){ toast("Cümleni biraz tamamla; kısa olabilir 🙂"); return; }
       const x = phS()[p.id] || (phS()[p.id] = {box:0, due:addDays(today(),1), seen:0, d0:today(), sc:sc.id});
-      x.mine = (x.mine||[]).concat(v).slice(-5); x.n = (x.n||0) + 1; save();
+      x.mine = (x.mine||[]).concat(v).slice(-5); x.n = (x.n||0) + 1; ev("use", p.id, v.split(/\s+/).length * (nrm(v).includes(p.k) ? 1 : -1)); save();
       if(!nrm(v).includes(p.k)) toast(`Güzel! Bir dahakine "${p.p.replace("…","")}" ifadesini de katmayı dene`);
       SCN.draft = null; SCN.said = false;
       if(SCN.pi+1<sc.ph.length){ SCN.pi++; } else { SCN.re = duePhrases(reShare(KEY)).filter(id=>!sc.ph.some(p=>p.id===id)); SCN.st = SCN.re.length ? "re" : "end"; if(!SCN.re.length) finishScene(); }
       redraw(); return; }
-    if(e.target.closest("[data-hint]")){ SCN.hint = true; redraw(); return; }
+    if(e.target.closest("[data-hint]")){ SCN.hint = true; ev("hint", SCN.re && SCN.re[SCN.ri]); redraw(); return; }
     if(e.target.closest("[data-rmic]")){ listenOnce(t=>{ $("#rea").value = t; }); return; }
     if(e.target.closest("[data-rc]")){ const id = SCN.re[SCN.ri], p = PHR[id], x = phS()[id], ci = (x.seen||0) % p.re.length, ans = p.re[ci][1], v = ($("#rea").value||"").trim();
       if(!v){ toast("Bir tahmin yaz; yanlış olsa da olur"); return; }
       const ok = nrm(v)===nrm(ans) || compare(ans, v).pct>=80 && norm(v).length<=norm(ans).length+1;
       x.seen = (x.seen||0) + 1; x.last = today(); logAdd("rv", 1); if(ok) logAdd("rvok", 1);
+      ev("rv", id, (ok ? 1 : -1) * Math.max(1, Math.min(999, Math.round((Date.now() - (SCN.t0||Date.now()))/1000))));   // sign = result, size = seconds; hints are their own event
       if(ok && !SCN.hint){ x.box = Math.min(5, x.box+1); SCN.rok++; } else if(ok){ x.box = Math.max(1, x.box); SCN.rok++; } else x.box = 0;
       x.due = addDays(today(), ok && !SCN.hint ? PH_INT[Math.min(4, x.box)] : 1); save();
       SCN.res = {v, ok, ci}; redraw(); return; }
-    if(e.target.closest("[data-rn]")){ SCN.res = null; SCN.hint = false; if(SCN.ri+1<SCN.re.length) SCN.ri++; else { SCN.st = "end"; finishScene(); } redraw(); return; }
+    if(e.target.closest("[data-rn]")){ SCN.res = null; SCN.hint = false; SCN.t0 = 0; if(SCN.ri+1<SCN.re.length) SCN.ri++; else { SCN.st = "end"; finishScene(); } redraw(); return; }
     if(e.target.closest("[data-snext]")){ advance(m, KEY); return; }
     if(e.target.closest("[data-rp]")){ bridge("Sahneyi Claude'la konuş", scenePrompt(sc), {save: scenePaste, tip:"Sohbetin sonunda Claude'un özetini buraya yapıştırırsan, kullandığın ifadeleri sayarım."}); return; }
     if(e.target.closest("[data-nat]")){ const mine = sc.ph.map(p=>(phS()[p.id]||{}).mine).filter(Boolean).map(a=>a.slice(-1)[0]);
@@ -1860,7 +1869,7 @@ function vExam(m){
       <button class="btn primary block" data-en style="margin-top:10px">Sıradaki →</button>` : ""}</div>`;
   m.onclick = e=>{
     const eo = e.target.closest("[data-eo]"); if(eo && EXQ.pick==null){ EXQ.pick = eo.dataset.eo; const ok = EXQ.pick===right, x = S.ex[g] || {box:0};
-      x.box = ok ? Math.min(5, x.box+1) : 0; x.due = addDays(today(), ok ? PH_INT[Math.min(4, x.box)] : 1); S.ex[g] = x; if(ok) EXQ.ok++; save(); vExam(m); return; }
+      x.box = ok ? Math.min(5, x.box+1) : 0; x.due = addDays(today(), ok ? PH_INT[Math.min(4, x.box)] : 1); S.ex[g] = x; if(ok) EXQ.ok++; ev("ex", g, ok ? 1 : -1); save(); vExam(m); return; }
     if(e.target.closest("[data-en]")){ EXQ.i++; EXQ.pick = null; EXQ.ord = null; vExam(m); }
   };
 }
@@ -1978,7 +1987,7 @@ function vGP(m){
   const gw = $("#gw"); if(gw && !fb) setTimeout(()=>gw.focus(), 30);
   if(fb){ const nb = m.querySelector("[data-next]"); if(nb) setTimeout(()=>nb.focus(), 30); }
   const answer = (ok, extra)=>{
-    if(!(it.k in GP.first)){ GP.first[it.k] = ok; logAdd("q"); if(ok) logAdd("qok"); }
+    if(!(it.k in GP.first)){ GP.first[it.k] = ok; logAdd("q"); if(ok) logAdd("qok"); ev("g", GP.lid+":"+it.k+":"+(it.t||it.type||""), ok ? 1 : extra && extra.pick===-1 ? 0 : -1); }
     if(!ok && !GP.re.has(it.k)){ GP.re.add(it.k); GP.items.push(it); }
     GP.fb = Object.assign({ok}, extra||{}); saveLocal(); vGP(m);
   };
@@ -2005,6 +2014,7 @@ function vGPEnd(m){
   if(!GP.saved){
     GP.saved = true;
     if(GP.mode==="lesson"){ const d = gr().done[GP.lid] || {}; passNow = pct>=70;
+      ev("gl", GP.lid, pct);
       gr().done[GP.lid] = {best:Math.max(d.best||0, pct), date:today(), pass: !!(d.pass||passNow), step:d.step||0, due: d.pass ? d.due : passNow ? addDays(today(), GR_INT[0]) : today(), tries:(d.tries||0)+1};
       if(passNow) logAdd("lessons"); }
     if(GP.mode==="lesson" || GP.mode==="rev"){ const g = game(); g.sc = (g.sc||[]).concat(pct).slice(-10); }
@@ -2369,6 +2379,34 @@ function mileStats(){ let sent = 0; Object.values(S.log||{}).forEach(l=>sent += 
   return {days: studyDays(), les: LESSONS.filter(l=>lessonPassed(l.id)).length, known: Object.values(S.cards).filter(c=>c.box>=3).length, sent, hrs: studiedHours()}; }
 function newMiles(){ const st = mileStats(), seen = S.miles = S.miles || {}; const got = MILES.filter(m=>m[3](st) && !seen[m[0]]); got.forEach(m=>seen[m[0]] = today()); if(got.length) save(); return got; }
 function badgesHTML(){ const seen = S.miles||{}; return `<div class="row">${MILES.map(m=>`<span class="chip" title="${esc(m[2])}" style="${seen[m[0]]?"":"opacity:.35;filter:grayscale(1)"}">${m[1]} ${esc(m[2])}</span>`).join("")}</div>`; }
+/* Habits and error patterns from the event log (last 28 days). */
+function behaviour(){
+  const from = Math.round(Date.now()/1000) - 28*86400, E = (S.ev||[]).filter(e=>e[0]>=from), cnt = (a,k)=>{ a[k] = (a[k]||0)+1; return a; };
+  const pct = (a,b)=>b ? Math.round(100*a/b) : null, med = a=>{ if(!a.length) return null; const s = a.slice().sort((x,y)=>x-y); return s[Math.floor(s.length/2)]; };
+  const hours = Array(24).fill(0), wd = Array(7).fill(0), mins = new Set();
+  E.forEach(e=>{ const m = Math.floor(e[0]/60); if(mins.has(m)) return; mins.add(m); const d = new Date(e[0]*1000); hours[d.getHours()]++; wd[(d.getDay()+6)%7]++; });
+  const ses = []; let s0 = null, s1 = null; E.forEach(e=>{ if(s1!=null && e[0]-s1 > 20*60){ ses.push(Math.max(1, Math.round((s1-s0)/60))); s0 = null; } if(s0==null) s0 = e[0]; s1 = e[0]; }); if(s0!=null) ses.push(Math.max(1, Math.round((s1-s0)/60)));
+  const by = t=>E.filter(e=>e[1]===t), rv = by("rv"), rok = rv.filter(e=>e[3]>0), fail = rv.filter(e=>e[3]<0);
+  const failBy = {}; fail.forEach(e=>cnt(failBy, e[2]));
+  const topFail = Object.entries(failBy).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([id,n])=>[PHR[id] ? PHR[id].p : id, n, (phS()[id]||{}).box||0]);
+  const use = by("use"), g = by("g"), gl = {}; g.forEach(e=>{ const id = String(e[2]).split(":")[0], o = gl[id] = gl[id] || {n:0, ok:0, idk:0}; o.n++; if(e[3]>0) o.ok++; if(e[3]===0) o.idk++; });
+  const weakG = Object.entries(gl).filter(([,o])=>o.n>=4).map(([id,o])=>[(lessonById(id)||{}).t || id, pct(o.ok,o.n), o.n]).sort((a,b)=>a[1]-b[1]).slice(0,5);
+  const gt = {}; g.forEach(e=>{ const ty = String(e[2]).split(":")[2] || "?", o = gt[ty] = gt[ty] || {n:0, ok:0}; o.n++; if(e[3]>0) o.ok++; });
+  const pt = {}; by("pt").forEach(e=>{ const o = pt[e[2]] = pt[e[2]] || [0,0,0]; o[e[3]===1 ? 0 : e[3]===0 ? 1 : 2]++; });
+  const dset = new Set(Object.keys(S.log||{}).filter(d=>dayMin(d)>=2)), gaps = []; let run = 0;
+  for(let i=27;i>=0;i--){ if(dset.has(addDays(today(),-i))){ if(run) gaps.push(run); run = 0; } else run++; }
+  return {olaySayisi: E.length, aktifDakika: mins.size, saatDagilimi: hours, gunDagilimi_PztPaz: wd,
+    oturum: {sayi: ses.length, ortancaDk: med(ses), enUzunDk: ses.length ? Math.max(...ses) : null, son10: ses.slice(-10)},
+    isaretlenen: by("st").filter(e=>e[3]===1).reduce((a,e)=>cnt(a,e[2]), {}), geriAlinan: by("st").filter(e=>e[3]===0).reduce((a,e)=>cnt(a,e[2]), {}), atlanan: by("skip").reduce((a,e)=>cnt(a,e[2]), {}),
+    tekrar: {n: rv.length, dogru: rok.length, ipucuIstenen: by("hint").length, yanlis: fail.length, oran: pct(rok.length, rv.length),
+      ortSnDogru: med(rok.map(e=>Math.abs(e[3]))), ortSnYanlis: med(fail.map(e=>Math.abs(e[3]))), enCokYanlis: topFail},
+    sahneSoru: {n: by("sq").length, ilkDenemeOran: pct(by("sq").filter(e=>e[3]>0).length, by("sq").length)},
+    kendiCumle: {n: use.length, ortKelime: use.length ? Math.round(use.reduce((a,e)=>a+Math.abs(e[3]),0)/use.length*10)/10 : null, ifadeyiKullanmaOran: pct(use.filter(e=>e[3]>0).length, use.length)},
+    gramer: {cevap: g.length, dogruOran: pct(g.filter(e=>e[3]>0).length, g.length), bilmiyorumOran: pct(g.filter(e=>e[3]===0).length, g.length), enZayifDersler: weakG,
+      soruTipine: Object.fromEntries(Object.entries(gt).map(([k,o])=>[k, pct(o.ok,o.n)+"% /"+o.n])), dersSkorlari: by("gl").map(e=>[(lessonById(e[2])||{}).t || e[2], e[3]])},
+    sinav: {n: by("ex").length, oran: pct(by("ex").filter(e=>e[3]>0).length, by("ex").length)},
+    seviyeTestiCevaplari_dogruBilmiyorumYanlis: pt, enCokAcilanSayfalar: Object.entries(by("v").reduce((a,e)=>cnt(a,e[2]), {})).sort((a,b)=>b[1]-a[1]).slice(0,10),
+    bosGunSerileri: gaps, suankiBosGun: run, son300Olay: (S.ev||[]).slice(-300)}; }
 /* Plain-text progress summary written to the user's Drive for the weekly planning agent. Stats only, no sentences or names. */
 function progressReport(){
   const t = today(), L = S.levels || {}, F = forecast(S.settings.pace||45), P = Object.values(phS()), done = scS();
@@ -2389,6 +2427,7 @@ function progressReport(){
     ifadeKutulari: [0,1,2,3,4,5].map(b=>P.filter(x=>(x.box||0)===b).length), kendiCumleSayisi: P.reduce((a,x)=>a+(x.mine||[]).length, 0),
     sinavKutulari: [0,1,2,3,4,5].map(b=>exs.filter(x=>(x.box||0)===b).length), seviyeGecmisi: (S.history||[]).slice(-6), son14GunAdimSayilari: steps, ruhHali14: mood,
     dizi: media().ser, dinleme: media().lis};
+  data.davranis = behaviour();
   return `İngilizce Defteri · ilerleme özeti (${t})\nBu dosyayı uygulama kendisi yazar; sadece istatistik içerir. Haftalık plan ajanı okur.\n\n` +
     `Seviye: ${Object.entries(data.seviye).map(([k,v])=>k+" "+v).join(", ")}\nHedef: Haziran 2027 B2 · B2 tahmini: ${data.b2Tahmin||"-"} · kalan ${data.b2KalanSaat??"-"} saat\n` +
     `Son 7 gün ort. ${data.son7GunOrt} dk/gün · son 28 gün ort. ${data.son28GunOrt} dk/gün · seçilen süre ${data.secilenSure} dk\n` +
@@ -2727,6 +2766,7 @@ function render(){
   if("speechSynthesis" in window) speechSynthesis.cancel();
   stopRec(); clearTimeout(FT); FT = null; clearInterval(BT);
   const r = route();
+  ev("v", r.page + (r.sub ? "/" + String(r.sub).split("/")[0] : ""));
   const inTest = r.page==="test";
   const tab = {ben:"rehber", kaynak:"rehber", cumle:"bugun", oyun:"rehber", adim:"bugun", gx:"gramer", kontrol:"bugun", sahne:"bugun", kelime:"ifade", sinav:"ifade"}[r.page] || r.page;
   $("#tabbar").style.display = inTest || !S.onboarded ? "none" : "";
@@ -2806,7 +2846,7 @@ function vTest(m){
     if(e.target.closest("[data-quit]")){ T = null; return; }
     if(e.target.closest("[data-next]")){ T.i++; vTest(m); return; }
     const o = e.target.closest("[data-k]");
-    if(o){ const k = +o.dataset.k; T.ans[T.i] = k===it.a ? 1 : k<0 ? 0 : -1; T.i++; vTest(m); return; }   // 1 right · 0 "Bilmiyorum" · -1 wrong
+    if(o){ const k = +o.dataset.k; T.ans[T.i] = k===it.a ? 1 : k<0 ? 0 : -1; ev("pt", it.sec+":"+it.lv, T.ans[T.i]); T.i++; vTest(m); return; }   // 1 right · 0 "Bilmiyorum" · -1 wrong
     if(e.target.closest("[data-skipsec]")){ const sec = it.sec; while(T.i<T.q.length && T.q[T.i].sec===sec){ T.ans[T.i]=0; T.i++; } vTest(m); return; }
     if(e.target.closest("[data-selfnext]")){
       T.self[it.sec] = [...m.querySelectorAll("input:checked")].map(c=>+c.dataset.l);
