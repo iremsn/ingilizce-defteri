@@ -1800,7 +1800,7 @@ function vScene(m, sub){
     if(e.target.closest("[data-rc]")){ const id = SCN.re[SCN.ri], p = PHR[id], x = phS()[id], ci = (x.seen||0) % p.re.length, ans = p.re[ci][1], v = ($("#rea").value||"").trim();
       if(!v){ toast("Bir tahmin yaz; yanlış olsa da olur"); return; }
       const ok = nrm(v)===nrm(ans) || compare(ans, v).pct>=80 && norm(v).length<=norm(ans).length+1;
-      x.seen = (x.seen||0) + 1; x.last = today();
+      x.seen = (x.seen||0) + 1; x.last = today(); logAdd("rv", 1); if(ok) logAdd("rvok", 1);
       if(ok && !SCN.hint){ x.box = Math.min(5, x.box+1); SCN.rok++; } else if(ok){ x.box = Math.max(1, x.box); SCN.rok++; } else x.box = 0;
       x.due = addDays(today(), ok && !SCN.hint ? PH_INT[Math.min(4, x.box)] : 1); save();
       SCN.res = {v, ok, ci}; redraw(); return; }
@@ -2383,7 +2383,11 @@ function progressReport(){
     b2Tahmin: b2.dAll!=null ? dateIn(b2.dAll) : null, b2KalanSaat: b2.hLeft!=null ? Math.round(b2.hLeft) : null,
     ifadeler: Object.assign({toplam: P.length, konusmadaKullanilan: P.filter(x=>(x.used||0)>0).length, oturan: P.filter(x=>x.box>=5).length, bugunTekrarBekleyen: duePhrases(9999).length}, st),
     sahneler: {toplam: SAHNE.length, eklenen: SAHNE.filter(s=>s.c).length, biten: SAHNE.filter(s=>done[s.id]).length}, fren: (S.done[t]||{}).brake ?? null,
-    gramerDersiGecilen: passed + "/" + LESSONS.length, sinavGrubu: exs.length, son14GunAdimSayilari: steps, ruhHali14: mood,
+    gramerDersiGecilen: passed + "/" + LESSONS.length, sinavGrubu: exs.length,
+    tekrar28: (()=>{ let n = 0, ok = 0; for(let i=0;i<28;i++){ const l = (S.log||{})[addDays(t,-i)] || {}; n += l.rv||0; ok += l.rvok||0; } return {n, dogru: ok, oran: n ? Math.round(100*ok/n) : null}; })(),
+    gramerSkorlari: Object.entries(gr().done).filter(([,d])=>d && d.date).slice(-15).map(([id,d])=>[id, d.best||0, d.pass?1:0, d.date]),
+    ifadeKutulari: [0,1,2,3,4,5].map(b=>P.filter(x=>(x.box||0)===b).length), kendiCumleSayisi: P.reduce((a,x)=>a+(x.mine||[]).length, 0),
+    sinavKutulari: [0,1,2,3,4,5].map(b=>exs.filter(x=>(x.box||0)===b).length), seviyeGecmisi: (S.history||[]).slice(-6), son14GunAdimSayilari: steps, ruhHali14: mood,
     dizi: media().ser, dinleme: media().lis};
   return `İngilizce Defteri · ilerleme özeti (${t})\nBu dosyayı uygulama kendisi yazar; sadece istatistik içerir. Haftalık plan ajanı okur.\n\n` +
     `Seviye: ${Object.entries(data.seviye).map(([k,v])=>k+" "+v).join(", ")}\nHedef: Haziran 2027 B2 · B2 tahmini: ${data.b2Tahmin||"-"} · kalan ${data.b2KalanSaat??"-"} saat\n` +
