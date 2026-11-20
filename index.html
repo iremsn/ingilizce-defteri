@@ -804,6 +804,8 @@ function mergeState(L, R){
   ["ph","ex"].forEach(f=>{ if(!R[f]) return; M[f] = M[f] || {}; Object.entries(R[f]).forEach(([k,b])=>{ const a = M[f][k];
     if(!a || (b.seen||0)+(b.used||0) > (a.seen||0)+(a.used||0) || ((b.seen||0)===(a.seen||0) && (b.due||"") > (a.due||""))) M[f][k] = Object.assign({}, b, a && a.mine && !b.mine ? {mine:a.mine} : {}); }); });
   if(R.sc){ M.sc = M.sc || {}; Object.entries(R.sc).forEach(([k,b])=>{ const a = M.sc[k]; if(!a || (b.d||"") > (a.d||"")) M.sc[k] = b; }); }
+  M.custDel = [...new Set([...(L.custDel||[]), ...(R.custDel||[])])];
+  M.custSc = byKey([...(L.custSc||[]), ...(R.custSc||[])], c=>c.id).filter(c=>!M.custDel.includes(c.id));
   M.grammarDone = [...new Set([...(L.grammarDone||[]), ...(R.grammarDone||[])])];
   M.journal = byKey([...(R.journal||[]), ...(L.journal||[])], j=>j.id).sort((a,b)=>a.id-b.id);
   if(R.wr){
@@ -1290,10 +1292,10 @@ function planOf(p){
   let t;
   if(p<=5) t = [["scene",5]];
   else if(p<45) t = [["scene",12],["gram",8]];
-  else if(p<60) t = [["scene",15],["gram",10],["read",10],["listen",10]];
-  else if(p<90) t = [["scene",15],["gram",10],["gramx",7],["read",10],["listen",10],["speak",8]];
-  else if(p<180) t = [["scene",15,1],["gram",12,1],["gramx",8,1],["write",5,1],["brk1",5,0],["read",15,2],["listen",15,2],["chat",15,2]];
-  else t = [["scene",15,1],["gram",15,1],["gramx",10,1],["write",10,1],["brk1",10,0],["read",20,2],["read2",20,2],["listen",15,2],["brk2",10,0],["series",25,3],["speak",10,3],["chat",15,3],["fun",5,3]];
+  else if(p<60) t = [["scene",15],["scene2",12],["gram",10],["read",8]];
+  else if(p<90) t = [["scene",15],["scene2",12],["gram",10],["gramx",7],["read",8],["speak",8]];
+  else if(p<180) t = [["scene",15,1],["scene2",12,1],["gram",12,1],["gramx",8,1],["brk1",5,0],["read",15,2],["listen",10,2],["chat",13,2]];
+  else t = [["scene",15,1],["scene2",15,1],["gram",15,1],["gramx",10,1],["brk1",10,0],["read",20,2],["read2",15,2],["listen",15,2],["brk2",10,0],["series",25,3],["speak",10,3],["chat",15,3],["fun",5,3]];
   // Sınav modu (optional): takes the place of "Cümle kur" (or Gramer+) on 45+ minute days
   if(p>=45 && S.settings.exam && S.pack && S.pack.sent){ const i = t.findIndex(x=>x[0]==="write"), j = t.findIndex(x=>x[0]==="gramx"), k = i>=0 ? i : j;
     if(k>=0) t[k] = ["exam", 10, t[k][2]]; else t.splice(2, 0, ["exam", 10]); }
@@ -1316,8 +1318,11 @@ function todaySteps(){
   const steps = [];
   tpl.forEach(([k, min, blk])=>{
     let s = null;
+    if(k==="scene2"){ const sc = sceneToday(2);
+      s = {n:"İkinci sahne", ic:"🎬", d: `${sc.ic} ${sc.t} · ${sc.ph.length} yeni ifade daha`, href:"#sahne/ikinci", at:["#sahne/ikinci"], done: stepGet("scene2"),
+        todo: `Aynı akış: dinle → anla → ${sc.ph.length} ifadeyi kendi hayatına uydur. Bugün toplam ${sceneToday().ph.length + sc.ph.length} yeni ifade.`}; }
     if(k==="scene"){ const sc = sceneToday(), nRe = duePhrases(9).length;
-      s = {n:"Günün sahnesi", ic:"🎬", d: `${sc.ic} ${sc.t}${p<=5 ? " · sadece dinle ve anla" : ` · 3 yeni ifade${nRe ? ` + ${Math.min(nRe, p>=90?4:2)} eski ifadeyle yeniden karşılaşma` : ""}`}`, href:"#sahne", at:["#sahne"], done: stepGet("scene"),
+      s = {n:"Günün sahnesi", ic:"🎬", d: `${sc.ic} ${sc.t}${p<=5 ? " · sadece dinle ve anla" : ` · ${sc.ph.length} yeni ifade${nRe ? ` + ${Math.min(nRe, p>=90?4:2)} eski ifadeyle yeniden karşılaşma` : ""}`}`, href:"#sahne", at:["#sahne"], done: stepGet("scene"),
         todo: p<=5 ? "Önce sadece dinle, sonra 3 kısa soru. Bu kadar." : "Önce sadece dinle → 3 soruyla ne olduğunu anla → 3 ifadeyi kendi hayatına uydur (yaz ya da söyle) → eski ifadeleri yeni cümlede hatırla."}; }
     if(k==="exam") s = {n:"Sınav modu", ic:"🎓", d:"10 eş anlamlı sorusu, cümle içinde (İTÜ tarzı)", href:"#sinav", at:["#sinav"], done: stepGet("exam"), todo:"Cümledeki renkli ifadenin yerine hangisi gelir? Seç; sonra gruptaki diğerlerini gör."};
     if(k==="cards") s = {n:"Kelime kartları", ic:"🗂️", d: nCards ? `${nCards} kart: tekrarlar ve yeni kelimeler` : "Bugünlük kart kalmadı", href:"#kelime/akis", done: !!d.cards || !nCards};
@@ -1556,14 +1561,80 @@ const SAHNE = [
       {id:"h2", p:"How about…?", ex:2, k:"how about", tr:"… yapsak? / … nasıl olur?", use:["Bu hafta sonu için bir şey öner.","How about "], re:[["\"I'm bored.\" — \"___ a walk by the sea?\"","How about"],["\"Where should we eat?\" — \"___ the new pizza place?\"","How about"]]},
       {id:"h3", p:"Sounds good!", ex:3, k:"sounds good", tr:"Olur! / Kulağa iyi geliyor", use:["Bir arkadaşın plan önerdi. Kabul et ve bir ayrıntı ekle.","Sounds good! "], re:[["\"Let's meet at the station at nine.\" — \"___ See you there.\"","Sounds good!"],["Your boss: \"We can finish the report tomorrow.\" — \"___\"","Sounds good!"]]}]}
 ];
+/* Scenes the user adds (written by ChatGPT/Claude from the prompt below, pasted in the app). No audio files: TTS reads them. */
+function sceneProblems(sc){
+  if(!sc || typeof sc!=="object" || Array.isArray(sc)) return ["sahne bir JSON nesnesi değil"];
+  const P = [], L = Array.isArray(sc.l) ? sc.l : [], who = sc.who || {};
+  ["id","t","ic","top"].forEach(f=>{ if(typeof sc[f]!=="string" || !sc[f].trim()) P.push(`"${f}" eksik`); });
+  if(!who.A || !who.B) P.push(`"who" içinde A ve B olmalı`);
+  if(L.length<4) P.push("en az 4 replik (l) olmalı");
+  L.forEach((x,i)=>{ if(!Array.isArray(x) || !(x[0] in who) || typeof x[1]!=="string" || typeof x[2]!=="string") P.push(`replik ${i}: ["A","English","Türkçe"] biçiminde olmalı`); });
+  if(!Array.isArray(sc.q) || sc.q.length<2) P.push("en az 2 soru (q) olmalı");
+  (sc.q||[]).forEach((q,i)=>{ if(!Array.isArray(q) || typeof q[0]!=="string" || !Array.isArray(q[1]) || q[1].length<3 || !(q[2]>=0 && q[2]<L.length)) P.push(`soru ${i}: ["soru", ["doğru","yanlış","yanlış"], replikNo] olmalı`); });
+  if(!Array.isArray(sc.ph) || sc.ph.length<3 || sc.ph.length>5) P.push("3–5 ifade (ph) olmalı");
+  (Array.isArray(sc.ph) ? sc.ph : []).forEach((p,i)=>{
+    if(!p || typeof p.p!=="string" || typeof p.k!=="string" || typeof p.tr!=="string"){ P.push(`ifade ${i}: "p", "k", "tr" eksik`); return; }
+    const line = L[p.ex]; if(!line || !String(line[1]).toLowerCase().replace(/’/g,"'").includes(p.k.toLowerCase())) P.push(`ifade ${i}: "k" ("${p.k}") ${p.ex}. replikte birebir geçmiyor`);
+    if(!Array.isArray(p.use) || p.use.length<2) P.push(`ifade ${i}: "use" ["soru","başlangıç"] olmalı`);
+    if(!Array.isArray(p.re) || p.re.length<2 || p.re.some(r=>!Array.isArray(r) || !String(r[0]).includes("___") || !r[1])) P.push(`ifade ${i}: "re" iki tane ["... ___ ...","cevap"] olmalı`); });
+  return P;
+}
+function sceneNormalize(sc){ if(!sc || typeof sc!=="object") return sc;
+  let id = String(sc.id||"sahne").toLowerCase().replace(/[çğıöşüâî]/g, c=>({ç:"c",ğ:"g",ı:"i",ö:"o",ş:"s",ü:"u",â:"a",î:"i"})[c]).replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"") || "sahne", base = id, n = 2;
+  while(SAHNE.some(x=>x.id===id)) id = base + "-" + n++;
+  sc.id = id; sc.c = 1; (sc.ph||[]).forEach((p,i)=>{ if(p){ p.id = "c-" + id + "-" + i; if(typeof p.k==="string") p.k = p.k.toLowerCase().replace(/’/g,"'").trim(); } }); return sc; }
+(S.custSc||[]).forEach(sc=>{ if(!SAHNE.some(x=>x.id===sc.id) && !sceneProblems(sc).length) SAHNE.push(sc); });
 const PHR = {}; SAHNE.forEach(sc=>sc.ph.forEach(p=>{ PHR[p.id] = Object.assign({sc: sc.id}, p); }));
+/* Level for new scenes: placement levels, then +1 for every 25 scenes done with most phrases known. */
+function sceneLevel(){ const L = S.levels||{}, v = ["vocab","grammar","reading","listening"].map(k=>L[k]).filter(x=>x>=0);
+  let lv = v.length ? Math.round(v.reduce((a,b)=>a+b,0)/v.length) : 1;
+  const done = Object.values(S.sc||{}).filter(x=>x && x.n).length, ph = Object.values(S.ph||{}), known = ph.filter(p=>p.box>=2).length;
+  if(ph.length>=20 && known/ph.length>=.6) lv += Math.floor(done/25);
+  return Math.max(1, Math.min(4, lv)); }
+function sceneGPTPrompt(){
+  const have = Object.values(PHR).map(p=>p.p).join(" | ");
+  const lv = sceneLevel(), now = LV[lv], next = LV[Math.min(lv+1, 4)], len = lv<=0 ? "6–8" : lv===1 ? "7–9" : "9–12";
+  return `İngilizce öğrenme uygulamam için 5 yeni kısa sahne yaz. Uygulama bunları JSON olarak okuyor; sesi telefon kendisi okuyor.
+
+Öğrenci: Türk, endüstriyel tasarım öğrencisi. Şu anki seviyesi ${now}. Sahneleri ${now} seviyesinde yaz; seçtiğin 5 ifade bir tık üstü (${now}–${next}) olsun. Hedefi konuşmak. Kelime listelerinden nefret ediyor; dili sahnelerin içinde öğreniyor.
+Replik sayısı: ${len}. Cümleler ${lv<=0 ? "kısa ve basit (çoğu 10 kelimeden az)" : lv===1 ? "doğal ama sade" : "doğal, gerçek hayattaki gibi; deyim ve bağlaçlar olabilir"}.
+Konular (5 sahnede farklı olsun): günlük hayat ve arkadaş sohbeti, kafe/restoran/seyahat, iş görüşmesi ve staj, endüstriyel tasarım ve yaratıcı süreç, sunum yapma ve fikir anlatma, sosyal ortamlarda doğal konuşma.
+
+KURALLAR
+- Doğal ve gündelik İngilizce. Kelimelerin yaklaşık %95'i ${now} seviyesinde bilinen kelimeler olsun; yeni olan sadece seçtiğin 5 ifade.
+- Her sahnede tam 5 faydalı ifade (kalıp): konuşmada gerçekten kullanılan, 2–5 kelimelik parçalar ("I'm running late", "How about…?" gibi). Tek kelime değil.
+- Şu ifadeleri TEKRAR KULLANMA, zaten var: ${have}
+- "k": ifadenin, ex numaralı replikte BİREBİR geçen küçük harfli parçası (ör. "running late"). Bu çok önemli: replikte aynen geçmeli.
+- "ex": ifadenin geçtiği replik numarası (0'dan başlar).
+- "use": [öğrencinin kendi hayatıyla ilgili Türkçe bir soru, İngilizce bir cümle başlangıcı].
+- "re": ifadenin TAMAMEN FARKLI bir durumda (başka yer, başka kişiler) geçtiği 2 yeni cümle. İfadenin yerinde "___" olsun; ikinci eleman boşluğa birebir gelecek metin.
+- "q": sahneyle ilgili 3 anlama sorusu (Türkçe). Seçenekler İngilizce ve 3 tane; DOĞRU CEVAP HER ZAMAN İLK SIRADA (uygulama karıştırıyor). Üçüncü eleman cevabın geçtiği replik numarası. Kelime çevirisi sorma; olay, karar ve durum sor.
+- "who": konuşanlar (A, B, gerekirse C). Ana karakter "Ece" (tasarım öğrencisi) olabilir.
+- "id": kısa, Türkçe karakter yok (ör. "muze", "kargo").
+
+ÇIKTI: Sadece JSON dizisi ver; açıklama yazma. Biçim (bu bir örnek, içeriği kopyalama):
+[{"id":"ornek","t":"Türkçe başlık","ic":"☕","top":"Günlük hayat","who":{"A":"Barista","B":"Ece"},
+"l":[["A","Hi! What can I get you?","Merhaba! Ne alırsın?"],["B","I'm in the mood for something warm.","Canım sıcak bir şey istiyor."]],
+"q":[["Ece ne istiyor?",["Something warm","Something cold","Nothing"],1]],
+"ph":[{"p":"I'm in the mood for…","ex":1,"k":"in the mood for","tr":"canım … istiyor","use":["Şu an canın ne istiyor?","I'm in the mood for "],"re":[["It's Friday night. I'm ___ a movie at home.","in the mood for"],["After the meeting Can said: \\"I'm ___ some fresh air.\\"","in the mood for"]]}]}]`; }
+function sceneImport(text){
+  let t = String(text||"").trim().replace(/^```(?:json)?/i, "").replace(/```\s*$/, "").trim(), data;
+  try{ data = JSON.parse(t); }catch(e){ return {added:[], bad:[["(tümü)", ["JSON okunamadı. ChatGPT'den sadece JSON vermesini iste, sonra tamamını kopyala."]]]}; }
+  const list = Array.isArray(data) ? data : data && Array.isArray(data.scenes) ? data.scenes : [data], added = [], bad = [];
+  list.forEach((sc, i)=>{ sceneNormalize(sc); const P = sceneProblems(sc);
+    if(P.length){ bad.push([sc && sc.t || ("sahne " + (i+1)), P]); return; }
+    SAHNE.push(sc); sc.ph.forEach(p=>{ PHR[p.id] = Object.assign({sc: sc.id}, p); }); S.custSc = (S.custSc||[]).concat(sc); added.push(sc.t); });
+  if(added.length) save(); return {added, bad}; }
 const PH_INT = [1, 3, 7, 21, 60];
 function phS(){ S.ph = S.ph || {}; return S.ph; }
 function scS(){ S.sc = S.sc || {}; return S.sc; }
 function phStatus(x){ return !x ? "" : (x.box>=4 || (x.used||0)>=1 && x.box>=2) ? "use" : x.box>=2 ? "known" : "new"; }
-function sceneToday(){ const d = fd(); if(d.scene && SAHNE.find(s=>s.id===d.scene)) return SAHNE.find(s=>s.id===d.scene);
-  const done = scS(), nx = SAHNE.find(s=>!done[s.id]) || SAHNE.slice().sort((a,b)=>(done[a.id].d||"")<(done[b.id].d||"")?-1:1)[0];
-  d.scene = nx.id; saveLocal(); return nx; }
+function sceneToday(slot){ const d = fd(), f = slot===2 ? "scene2" : "scene", other = slot===2 ? d.scene : d.scene2;
+  if(d[f] && SAHNE.find(s=>s.id===d[f])) return SAHNE.find(s=>s.id===d[f]);
+  if(slot===2 && !d.scene) sceneToday(1);
+  const done = scS(), pool = SAHNE.filter(s=>s.id!==(slot===2 ? d.scene : other));
+  const nx = pool.find(s=>!done[s.id]) || pool.slice().sort((a,b)=>((done[a.id]||{}).d||"")<((done[b.id]||{}).d||"")?-1:1)[0] || SAHNE[0];
+  d[f] = nx.id; saveLocal(); return nx; }
 function duePhrases(n){ const t = today(); return Object.entries(phS()).filter(([id,x])=>PHR[id] && x.due<=t && x.d0!==t).sort((a,b)=>a[1].due<b[1].due?-1:a[1].box-b[1].box).slice(0, n).map(([id])=>id); }
 // two (or three) different voices for the characters
 function sayAs(text, who, slow, onend){
@@ -1577,7 +1648,7 @@ function listenOnce(cb){ if(!SR){ toast("Bu tarayıcı sesi yazıya çeviremiyor
 let SCN = null;
 function scenePrompt(sc){
   const mine = sc.ph.map(p=>p.p).join(", "), old = Object.keys(phS()).filter(id=>PHR[id] && PHR[id].sc!==sc.id).slice(-5).map(id=>PHR[id].p).join(", ");
-  return `Sen benim İngilizce konuşma partnerimsin. Seviyem yaklaşık A2; konuşma becerimi geliştirmek istiyorum.
+  return `Sen benim İngilizce konuşma partnerimsin. Seviyem yaklaşık ${LV[sceneLevel()]}; konuşma becerimi geliştirmek istiyorum.
 Şu sahneyi birlikte canlandıralım: "${sc.t}". Sen ${sc.who.A} ol, ben ${sc.who.B === "Ece" ? "kendim" : sc.who.B} olayım. Durumu biraz değiştir ki ezber olmasın.
 Kurallar:
 - Kısa ve doğal konuş (1–2 cümle), bana soru sorarak konuşmayı sürdür.
@@ -1593,11 +1664,28 @@ function scenePaste(v){ // the chat summary pasted back: phrases the learner act
 function vScene(m, sub){
   if(sub==="liste"){ const done = scS();
     m.innerHTML = `<a class="btn ghost" href="#ifade">‹ İfadeler</a><h1>Sahneler</h1><p class="sub">İstediğini seç. Bitirdiklerini tekrar dinlemek de serbest.</p>
-      ${SAHNE.map(sc=>`<a class="card lrow" href="#sahne/${sc.id}" style="text-decoration:none;color:inherit"><span style="font-size:26px">${sc.ic}</span><span style="flex:1"><b>${esc(sc.t)}</b><span class="small muted" style="display:block">${esc(sc.top)} · ${sc.ph.map(p=>esc(p.p)).join(" · ")}</span></span>${done[sc.id] ? `<span class="tag acc">✓</span>` : "›"}</a>`).join("")}`; return; }
+      <details class="card" ${SCN && SCN.imp ? "open" : ""}><summary style="cursor:pointer"><b>➕ Yeni sahne ekle (ChatGPT ile)</b><div class="small muted">Senin seviyene (${LV[sceneLevel()]}) göre 5 sahne, her biri 5 ifade. Ses dosyası gerekmez; telefon okur.</div></summary>
+        <ol class="small" style="margin:10px 0;padding-left:18px"><li>“Komutu kopyala”ya bas, ChatGPT'ye yapıştır.</li><li>Gelen cevabın tamamını kopyala.</li><li>Aşağıya yapıştır, “Ekle”ye bas.</li></ol>
+        <div class="row"><button class="btn primary" data-gpt>📋 Komutu kopyala</button><a class="btn ghost" href="https://chatgpt.com/" target="_blank" rel="noopener">ChatGPT'yi aç ↗</a></div>
+        <textarea id="impt" rows="4" placeholder="ChatGPT'nin cevabını buraya yapıştır" style="margin-top:10px"></textarea>
+        <button class="btn block" data-imp style="margin-top:8px">Ekle</button>
+        ${SCN && SCN.imp ? `<div class="card soft small" style="margin:10px 0 0">${SCN.imp.added.length ? `<b>${SCN.imp.added.length} sahne eklendi ✓</b> ${SCN.imp.added.map(esc).join(" · ")}` : ""}
+          ${SCN.imp.bad.length ? `<div style="margin-top:6px"><b>Eklenemeyen:</b> bunu ChatGPT'ye yapıştır, düzeltsin:</div><textarea rows="4" readonly style="margin-top:4px">Şu sahnelerde sorun var, düzeltip yine sadece JSON ver:\n${SCN.imp.bad.map(([t,P])=>"- "+t+": "+P.join("; ")).join("\n")}</textarea>` : ""}</div>` : ""}
+      </details>
+      ${SAHNE.map(sc=>`<div class="card lrow"><a href="#sahne/${sc.id}" class="row" style="flex:1;gap:10px;text-decoration:none;color:inherit"><span style="font-size:26px">${sc.ic}</span><span style="flex:1"><b>${esc(sc.t)}</b>${sc.c ? ` <span class="tiny">🧩 eklenen</span>` : ""}<span class="small muted" style="display:block">${esc(sc.top)} · ${sc.ph.map(p=>esc(p.p)).join(" · ")}</span></span>${done[sc.id] ? `<span class="tag acc">✓</span>` : "›"}</a>${sc.c ? `<button class="btn ghost sm" data-del="${sc.id}" aria-label="Sahneyi sil">🗑</button>` : ""}</div>`).join("")}`;
+    m.onclick = e=>{
+      if(e.target.closest("[data-gpt]")){ copyText(sceneGPTPrompt()).then(()=>toast("Kopyalandı, ChatGPT'ye yapıştır")); return; }
+      if(e.target.closest("[data-imp]")){ const v = $("#impt").value; if(!v.trim()){ toast("Önce ChatGPT'nin cevabını yapıştır"); return; }
+        SCN = Object.assign(SCN||{}, {imp: sceneImport(v)}); vScene(m, "liste"); return; }
+      const del = e.target.closest("[data-del]"); if(del){ const id = del.dataset.del, sc = SAHNE.find(s=>s.id===id); if(!sc || !confirm(`"${sc.t}" silinsin mi?`)) return;
+        SAHNE.splice(SAHNE.indexOf(sc), 1); sc.ph.forEach(p=>{ delete PHR[p.id]; delete phS()[p.id]; }); S.custSc = (S.custSc||[]).filter(x=>x.id!==id);
+        S.custDel = (S.custDel||[]).concat(id); const d = fd(); if(d.scene===id) delete d.scene; if(d.scene2===id) delete d.scene2; save(); vScene(m, "liste"); }
+    }; return; }
   if(sub==="konus"){ const sc = sceneToday(); m.innerHTML = `<a class="btn ghost" href="#bugun">‹ Bugün</a><h1>💬 ${esc(sc.t)}</h1><p class="sub">Bugünkü sahneyi Claude'la canlandır. Konuşmayı kesmez, sonda geri bildirim verir.</p><button class="btn primary block" data-rp>Komutu aç</button>`;
     const open = ()=>bridge("Sahneyi Claude'la konuş", scenePrompt(sc), {save: scenePaste, tip:"Sohbetin sonunda Claude'un özetini buraya yapıştırırsan, kullandığın ifadeleri sayarım."});
     m.onclick = e=>{ if(e.target.closest("[data-rp]")) open(); }; open(); return; }
-  const sc = sub && SAHNE.find(s=>s.id===sub) || sceneToday();
+  const two = sub==="ikinci", KEY = two ? "scene2" : "scene"; if(two) sub = "";
+  const sc = sub && SAHNE.find(s=>s.id===sub) || sceneToday(two ? 2 : 1);
   if(!SCN || SCN.id!==sc.id || SCN.day!==today()) SCN = {id:sc.id, day:today(), st:"listen", show:false, tr:{}, qi:0, a:{}, ok:0, pi:0, said:false, re:null, ri:0, rok:0, hint:false, res:null};
   const short = pace()<=5 && !sub, lv = SAHNE.indexOf(sc)+1;
   const head = `<div class="between"><a class="btn ghost" href="${sub ? "#sahne/liste" : "#bugun"}">‹ ${sub ? "Sahneler" : "Plan"}</a><span class="tag acc">${esc(sc.top)}</span></div>
@@ -1646,7 +1734,7 @@ function vScene(m, sub){
     body = `<div class="card" style="text-align:center"><div style="font-size:40px">${sc.ic}</div><h2 style="margin:6px 0">Bu sahneyi anladın ✓</h2>
       <div class="small muted">${SCN.ok}/${sc.q.length} soruyu ilk denemede bildin${SCN.re && SCN.re.length ? ` · ${SCN.rok}/${SCN.re.length} eski ifadeyi hatırladın` : ""}.</div>
       ${short ? "" : `<div class="small" style="margin-top:8px">Yeni ifadelerin: ${sc.ph.map(p=>`<b lang="en">${esc(p.p)}</b>`).join(" · ")}</div>`}</div>
-      ${todaySteps().some(s=>s.k==="scene") ? `<button class="btn primary block" data-snext>Sıradaki adıma geç →</button>` : `<a class="btn primary block" href="#ifade">İfadelerime bak →</a>`}
+      ${todaySteps().some(s=>s.k===KEY) ? `<button class="btn primary block" data-snext>Sıradaki adıma geç →</button>` : `<a class="btn primary block" href="#ifade">İfadelerime bak →</a>`}
       <div class="card"><div class="tiny">İSTERSEN (BİRAZ DAHA KONUŞ)</div>
       <button class="btn block" data-rp style="margin-top:6px">💬 Bu sahneyi Claude'la canlandır</button>
       ${mine.length ? `<button class="btn ghost block" data-nat style="margin-top:6px">✨ Kendi cümlelerimi Claude doğallaştırsın</button>` : ""}</div>`;
@@ -1686,12 +1774,12 @@ function vScene(m, sub){
       x.due = addDays(today(), ok && !SCN.hint ? PH_INT[Math.min(4, x.box)] : 1); save();
       SCN.res = {v, ok, ci}; redraw(); return; }
     if(e.target.closest("[data-rn]")){ SCN.res = null; SCN.hint = false; if(SCN.ri+1<SCN.re.length) SCN.ri++; else { SCN.st = "end"; finishScene(); } redraw(); return; }
-    if(e.target.closest("[data-snext]")){ advance(m, "scene"); return; }
+    if(e.target.closest("[data-snext]")){ advance(m, KEY); return; }
     if(e.target.closest("[data-rp]")){ bridge("Sahneyi Claude'la konuş", scenePrompt(sc), {save: scenePaste, tip:"Sohbetin sonunda Claude'un özetini buraya yapıştırırsan, kullandığın ifadeleri sayarım."}); return; }
     if(e.target.closest("[data-nat]")){ const mine = sc.ph.map(p=>(phS()[p.id]||{}).mine).filter(Boolean).map(a=>a.slice(-1)[0]);
       bridge("Cümlelerimi doğallaştır", `Ben A2 seviyesinde, konuşmamı geliştirmek isteyen bir İngilizce öğrencisiyim. Aşağıdaki cümleleri kendi hayatımdan yazdım:\n${mine.map(x=>"- "+x).join("\n")}\n\nHer cümle için: anlaşılıyorsa önce bunu söyle, sonra bir ana dili İngilizce olan kişinin aynı şeyi nasıl söyleyeceğini göster ve farkı Türkçe tek cümleyle açıkla. Kısa ve cesaretlendirici ol.`); return; }
   };
-  function finishScene(){ const d = scS()[sc.id] || {}; scS()[sc.id] = {d: today(), n:(d.n||0)+1, ok: SCN.ok}; logAdd("min", 8); if(todaySteps().some(s=>s.k==="scene" && !s.done)) markStep("scene", true); else save(); }
+  function finishScene(){ const d = scS()[sc.id] || {}; scS()[sc.id] = {d: today(), n:(d.n||0)+1, ok: SCN.ok}; logAdd("min", 8); if(todaySteps().some(s=>s.k===KEY && !s.done)) markStep(KEY, true); else save(); }
 }
 /* İfadeler tab: the phrase journal (no word lists). Turkish only behind a tap. */
 function vPhr(m){
@@ -2114,10 +2202,10 @@ function startSyn(){
 const LV_HOURS = [100, 200, 375, 550, 800];
 const PACES = {
   20:{n:"Hafif", items:["🎬 Günün sahnesi (12 dk) → Gramer dersi (8 dk)"]},
-  45:{n:"Dengeli", items:["🎬 Günün sahnesi → Gramer (25 dk)","Okuma: uygulamadaki sıradaki metin (10 dk)","Dinleme: seviyene göre belirli bir ders, bağlantısıyla (10 dk)"]},
-  60:{n:"Kararlı", items:["🎬 Sahne → Gramer → Gramer+ (32 dk)","Okuma (10 dk)","Dinleme (10 dk)","Konuşma: gölge okuma + 1 dk konuşma (8 dk)"]},
-  90:{n:"Yoğun", items:["Blok 1: Sahne, Gramer, Gramer+, Cümle kur (40 dk)","5 dk mola","Blok 2: Okuma, Dinleme, sahneyi Claude'la canlandırma (45 dk)"]},
-  180:{n:"Kamp", items:["Blok 1 · Temel: Sahne, Gramer, Gramer+, Cümle kur (50 dk)","10 dk mola","Blok 2 · Girdi: 2 okuma metni + dinleme (55 dk)","10 dk mola","Blok 3 · Çıktı ve keyif: dizi bölümü, konuşma, Claude sohbeti, kapanış (55 dk)","Kitaplar yanındaysa bazı adımlar kitabın belirli sayfalarına dönüşür"]}
+  45:{n:"Dengeli", items:["🎬 2 sahne: 10'a kadar yeni ifade (27 dk)","Gramer dersi (10 dk)","Okuma: uygulamadaki sıradaki metin (8 dk)"]},
+  60:{n:"Kararlı", items:["🎬 2 sahne: 10'a kadar yeni ifade (27 dk)","Gramer → Gramer+ (17 dk)","Okuma (8 dk)","Konuşma: gölge okuma + 1 dk konuşma (8 dk)"]},
+  90:{n:"Yoğun", items:["Blok 1: 2 sahne, Gramer, Gramer+ (47 dk)","5 dk mola","Blok 2: Okuma, Dinleme, sahneyi Claude'la canlandırma (38 dk)"]},
+  180:{n:"Kamp", items:["Blok 1 · Temel: 2 sahne, Gramer, Gramer+ (55 dk)","10 dk mola","Blok 2 · Girdi: 2 okuma metni + dinleme (55 dk)","10 dk mola","Blok 3 · Çıktı ve keyif: dizi bölümü, konuşma, Claude sohbeti, kapanış (55 dk)","Kitaplar yanındaysa bazı adımlar kitabın belirli sayfalarına dönüşür"]}
 };
 function resting(){ return !!(S.settings.rest && S.settings.rest >= today()); }
 function basePace(){ return resting() ? 5 : (S.settings.pace || 45); }
