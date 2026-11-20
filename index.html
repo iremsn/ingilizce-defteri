@@ -2178,19 +2178,22 @@ function bookRead(el, id){
   <details class="card"><summary class="small"><b>Sözlük (${(R.gl||[]).length} kelime)</b></summary><div class="small" style="margin-top:8px;line-height:1.8">${(R.gl||[]).map(([e,t])=>`<span lang="en"><b>${esc(e)}</b></span> ${esc(t)}`).join(" · ")}</div></details>
   <h2>Sorular</h2><div class="card">${Q.map((q,i)=>`<div style="padding:8px 0;border-top:${i?"1px solid var(--line)":"0"}"><div class="small"${q.o[0]==="Doğru"?"":' lang="en"'}><b>${i+1}.</b> ${q.m?"<b>Ana fikir:</b> ":""}${esc(q.t)}</div>
     <div class="row" style="margin-top:6px;gap:6px">${q.o.map((o,j)=>{ const sel = BR.a[i]===j, ok = BR.chk && j===q.a, bad = BR.chk && sel && j!==q.a;
-      return `<button class="chip" data-qa="${i}:${j}" style="${sel?"outline:2px solid var(--acc);":""}${ok?"background:#2e9e6a;color:#fff;":""}${bad?"background:#e08a2e;color:#fff;":""}"${q.o[0]==="Doğru"?"":' lang="en"'}>${esc(o)}</button>`; }).join("")}</div></div>`).join("")}
-   ${BR.chk ? `<div class="card soft" style="margin:10px 0 0"><b>${right}/${Q.length} doğru (%${Math.round(100*right/Q.length)})</b>${R.min?` · ${mins} dakika`:""}<div class="small" style="margin-top:4px">${right/Q.length>=.9?"Harika! Sürekli böyleyse bir üst seviyeden metin dene.":right/Q.length>=.7?"Tam %85 bölgesindesin, böyle devam.":"Bu metin şimdilik zorladı. Turuncu yanlışların kanıt cümlesini metinde bul; yarın bir kolay metin oku."}</div>
+      return `<button class="chip" data-qa="${i}:${j}" style="${sel&&!BR.chk?"outline:2px solid var(--acc);background:var(--acc);color:#fff;":sel?"outline:2px solid var(--acc);":""}${ok?"background:#2e9e6a;color:#fff;":""}${bad?"background:#e08a2e;color:#fff;":""}"${q.o[0]==="Doğru"?"":' lang="en"'}>${esc(o)}</button>`; }).join("")}</div></div>`).join("")}
+   ${BR.chk ? `<div class="card soft" style="margin:10px 0 0"><b>${right}/${Q.length} doğru (%${Math.round(100*right/Q.length)})</b>${R.min?` · ${mins} dakika`:""}<div class="small" style="margin-top:4px">${right/Q.length>=.9?"Harika! Sürekli böyleyse bir üst seviyeden metin dene.":right/Q.length>=.7?"Tam %85 bölgesindesin, böyle devam.":"Bu metin şimdilik zorladı. Turuncu yanlışların kanıt cümlesini metinde bul; yarın bir kolay metin oku."}</div><button class="btn ghost sm" data-retry style="margin-top:8px">↺ Yeniden çöz</button>
      ${(()=>{ const s = todaySteps().find(x=>x.rid===id); return s ? `<button class="btn primary block" data-snext="${s.k}" style="margin-top:10px">✓ Okuma adımı tamam · sıradakine geç →</button><div class="tiny" style="margin-top:4px">İstersen önce aşağıdaki yazma görevini yap; isteğe bağlı.</div>` : ""; })()}</div>`
      : `<button class="btn primary block" data-chk style="margin-top:10px">Kontrol et</button>`}</div>
   ${R.task ? `<h2>Yazma görevi</h2><div class="card stack"><p class="small" style="margin:0">${esc(R.task)}</p><textarea id="btask" rows="4" lang="en" placeholder="Write here…">${esc((prev&&prev.task)||"")}</textarea>
    <div class="row"><button class="btn sm" data-tsave>Kaydet</button><button class="btn ghost sm" data-tcl>Claude'a kontrol ettir</button></div></div>` : ""}`;
   el.onclick = e=>{
     if(e.target.closest("[data-t0]")){ BR.t0 = Date.now(); bookRead(el, id); return; }
-    const qa = e.target.closest("[data-qa]"); if(qa && !BR.chk){ const [i,j] = qa.dataset.qa.split(":").map(Number); BR.a[i] = j; bookRead(el, id); return; }
+    const qa = e.target.closest("[data-qa]"); if(qa && !BR.chk){ const [i,j] = qa.dataset.qa.split(":").map(Number); BR.a[i] = j;
+      /* yerinde güncelle: tüm sayfayı yeniden çizmek iPhone'da sayfayı başa kaydırıyordu */
+      el.querySelectorAll(`[data-qa^="${i}:"]`).forEach(b=>{ const on = b===qa; b.style.outline = on ? "2px solid var(--acc)" : ""; b.style.background = on ? "var(--acc)" : ""; b.style.color = on ? "#fff" : ""; }); return; }
     if(e.target.closest("[data-chk]")){ if(Object.keys(BR.a).length < Q.length && !confirm("Boş bıraktığın sorular var. Yine de kontrol edeyim mi?")) return;
       BR.chk = true; const r = Q.filter((q,i)=>BR.a[i]===q.a).length, p = g.rd[id];
       if(!p || r > p.best) g.rd[id] = Object.assign({}, p, {best:r, of:Q.length, d:today()});
       const s = todaySteps().find(x=>x.rid===id); if(s && !s.done) markStep(s.k, true); save(); bookRead(el, id); return; }
+    if(e.target.closest("[data-retry]")){ BR.a = {}; BR.chk = false; bookRead(el, id); return; }
     if(e.target.closest("[data-snext]")){ advance(el, e.target.closest("[data-snext]").dataset.snext); return; }
     if(e.target.closest("[data-tsave]")){ g.rd[id] = Object.assign({best:0, of:Q.length, d:today()}, g.rd[id], {task: $("#btask").value}); save(); toast("Kaydedildi"); return; }
     if(e.target.closest("[data-tcl]")){ const t = $("#btask").value.trim(); if(!t){ toast("Önce birkaç cümle yaz"); return; }
