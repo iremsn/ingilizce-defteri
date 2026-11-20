@@ -2284,8 +2284,10 @@ function dayMin(d){ const l = (S.log||{})[d] || {};
   return Math.max(0, Math.max(l.min||0, est) + (l.ext||0)); }
 function baseHours(){
   if(!S.levels) return 0;
+  // reading/listening can't sensibly sit 2+ levels above vocabulary and grammar (old scoring let guesses do that): cap at +1
+  const cap = Math.max(S.levels.vocab ?? -1, S.levels.grammar ?? -1) + 1;
   const F = S.levelsF || {}, v = ["vocab","grammar","reading","listening"].map(k=>{ const L = S.levels[k] ?? -1, f = F[k];   // fine test value while it still matches the level
-    return f!=null && Math.max(-1, Math.min(4, Math.floor(f + 0.3)))===L ? Math.min(f, L + 0.7) : L; }), avg = v.reduce((a,b)=>a+b,0)/v.length;
+    const x = f!=null && Math.max(-1, Math.min(4, Math.floor(f + 0.3)))===L ? Math.min(f, L + 0.7) : L; return (k==="reading" || k==="listening") ? Math.min(x, cap) : x; }), avg = v.reduce((a,b)=>a+b,0)/v.length;
   if(avg<0) return Math.round(100*(avg+1));
   const lo = Math.floor(avg), hi = Math.min(4, lo+1);
   return Math.round(LV_HOURS[lo] + (LV_HOURS[hi]-LV_HOURS[lo])*(avg-lo));
@@ -2348,7 +2350,9 @@ function forecast(planMin){
   const trend = active>=5 && w2>0 ? (w1>w2*1.25 ? "up" : w1<w2*0.75 ? "down" : "flat") : null;
   const lessons28 = Object.values(gr().done).filter(d=>d.pass && d.date && d.date>addDays(t,-28)).length;
   const H = totalHours();
-  const per = real!=null ? real : planMin;
+  // trust real data gradually: a few days in, a 7-day average of new-starter days says little (it gave "2033")
+  const first = Object.keys(S.log||{}).filter(d=>dayMin(d)>0).sort()[0], age = first ? Math.round((new Date(t+"T12:00:00") - new Date(first+"T12:00:00"))/864e5) + 1 : 0, wR = Math.min(1, age/28);
+  const per = real!=null ? wR*real + (1-wR)*planMin : planMin;
   const rows = [2,3,4].map(i=>{
     const hLeft = Math.max(0, LV_HOURS[i]-H), dH = hLeft*60/Math.max(3, per);
     const lLeft = LESSONS.filter(l=>l.lv<=i && !lessonPassed(l.id)).length;
@@ -2357,7 +2361,7 @@ function forecast(planMin){
     const planH = hLeft*60/Math.max(3, planMin), planAll = Math.max(planH, lLeft / Math.max(lRate, planMin/60*0.5));
     return {i, lv:LVN[i], hLeft, lLeft, dAll, planAll, limit: dL>dH ? "ders" : "saat", done: hLeft<=0 && lLeft===0};
   });
-  return {real: real!=null ? Math.round(real) : null, active, span, trend, lessons28, H, per, planMin, rows};
+  return {real: real!=null ? Math.round(real) : null, active, span, trend, lessons28, H, per, planMin, rows, age, wR};
 }
 /* Target: abroad internship by June 2027 → B2 (B1+ with confident speaking is the minimum). */
 function goalHTML(){ const g = S.target || {date:"2027-06-01", lv:3}, left = Math.round((new Date(g.date+"T12:00:00") - new Date(today()+"T12:00:00"))/864e5);
@@ -2366,13 +2370,13 @@ function goalHTML(){ const g = S.target || {date:"2027-06-01", lv:3}, left = Mat
   if(!r || r.done) return `<div class="card soft small">🎯 Hedef ${LVN[g.lv]} saatlerine ulaştın 🎉 Şimdi konuşma pratiğine ağırlık ver.</div>`;
   const need = Math.ceil(r.hLeft*60/left), per = Math.round(F.per), ok = r.dAll<=left, near = !ok && per>=need*0.8;
   // smallest weekday/weekend mix from the app's own tempo options that covers the need
-  const mixes = [[45,0],[60,0],[60,90],[90,0],[90,180],[180,0]].map(([a,b])=>[a,b,(5*a+2*(b||a))/7]), fit = mixes.find(x=>x[2]>=need) || mixes[mixes.length-1];
+  const mixes = [[45,0],[60,0],[60,90],[90,0],[90,180],[180,0]].map(([a,b])=>[a,b,(5*a+2*(b||a))/7]), fit = mixes.find(x=>x[2]>=need-20) || mixes[mixes.length-1], extra = Math.ceil(need - fit[2]);
   const isSet = (S.settings.pace||45)===fit[0] && (S.settings.wkend||0)===fit[1];
-  const mixTxt = `hafta içi ${fit[0]} dk${fit[1] ? `, hafta sonu ${fit[1]>=180?"3 saat":fit[1]+" dk"}` : ", hafta sonu da aynı"}`;
+  const mixTxt = `hafta içi ${fit[0]} dk${fit[1] ? `, hafta sonu ${fit[1]>=180?"3 saat":fit[1]+" dk"}` : ", hafta sonu da aynı"}${extra>0 ? ` + günde ${extra} dk uygulama dışı (dizi, dinleme; işaretle ki sayılsın)` : ""}`;
   const msg = ok ? `Bu hızla yetişiyorsun 🌱 Tahmin: ${dateIn(r.dAll)}.`
     : `${near ? "Çok az kaldı." : `Şu hızla ${LVN[g.lv]}: ${dateIn(r.dAll)}${b1 && !b1.done && b1.dAll<=left ? `; Haziran'da ${LVN[g.lv-1]} olursun` : ""}.`} Yetişmek için: ${mixTxt}.${F.real!=null && avgPlan()>=need ? " Planın yetiyor; gerçek ortalaman plana yetişirse tamam." : isSet ? "" : ` <button class="btn sm" data-goalplan="${fit[0]}:${fit[1]}">Bu tempoyu kur</button>`}`;
   return `<div class="card"><div class="between"><b>🎯 Haziran 2027 · yurt dışı staj</b><span class="tag acc">${left} gün</span></div>
-    <div class="small" style="margin-top:6px">Hedef <b>${LVN[g.lv]}</b>: ${Math.round(r.hLeft)} saat kaldı → günde ortalama <b>${need} dk</b>. Senin ortalaman: <b>${per} dk</b>${F.real==null ? " (seçtiğin süre; gerçek veri birkaç gün sonra)" : ""}.</div>
+    <div class="small" style="margin-top:6px">Hedef <b>${LVN[g.lv]}</b>: ${Math.round(r.hLeft)} saat kaldı → günde ortalama <b>${need} dk</b>. ${F.real==null ? `Planın: <b>${per} dk</b> (gerçek veri birkaç gün sonra).` : `Gerçek ortalaman: <b>${F.real} dk</b>, planın ${avgPlan()} dk.${F.wR<1 ? ` Daha ${F.age}. gündesin; tahmin şimdilik çoğunlukla plana dayanıyor, 4 haftada tamamen gerçek veriye geçer.` : ""}`}</div>
     <div class="small" style="margin-top:4px">${msg}</div>
     <div class="tiny" style="margin-top:4px">Saat tek başına konuşma getirmez: haftada 1 konuşma dersi + her gün sahne. Kitap ve dizi adımlarını işaretle ki saatlerin sayılsın.</div></div>`; }
 function forecastHTML(planMin, compact){
@@ -3031,6 +3035,7 @@ function vToday(m){
   ${(()=>{ const n = Sync.noteGet(); if(!n.txt) return "";
     return `<details class="card" ${n.isNew ? "open" : ""} data-note><summary style="cursor:pointer"><b>💬 Haftalık notun</b>${n.isNew ? ` <span class="tag acc">yeni</span>` : ""}<div class="tiny">Senin verilerine bakılarak yazıldı</div></summary>
       <div class="small" style="white-space:pre-wrap;margin-top:8px">${esc(n.txt)}</div>${n.isNew ? `<button class="btn ghost sm" data-noteok style="margin-top:8px">Okudum ✓</button>` : ""}</details>`; })()}
+  ${S.levels && !S.levelsF && S.testDate ? `<div class="card soft small">🧭 Seviye testin eski puanlamayla hesaplandı (şansla tutan cevaplar seviye atlatıyordu). Hedef tahmini doğru olsun diye testi bir kez daha çöz, yaklaşık 15 dk. <a class="btn sm" href="#test">Testi çöz</a></div>` : ""}
   ${goalHTML()}
   <div class="card" style="border:2px solid var(--accent)"><div class="between"><h3 style="margin:0">📘 Bugünkü planın</h3><span class="tag acc">${allDone?"bitti ✓":`adım ${cur+1}/${steps.length}`}</span></div>
    ${pace()>=45 && !allDone ? `<div class="small" style="margin:8px 0 2px">📕 Kitapların bugün yanında mı? <span class="row" style="display:inline-flex;gap:6px;vertical-align:middle"><button class="chip" data-books="1" aria-pressed="${booksOn()}">Evet</button><button class="chip" data-books="0" aria-pressed="${!booksOn()}">Hayır</button></span>
