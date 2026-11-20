@@ -2263,15 +2263,18 @@ const PACES = {
   180:{n:"Kamp", items:["Blok 1 · Temel: 2 sahne, Gramer, Gramer+ (55 dk)","10 dk mola","Blok 2 · Girdi: 2 okuma metni + dinleme (55 dk)","10 dk mola","Blok 3 · Çıktı ve keyif: dizi bölümü, konuşma, Claude sohbeti, kapanış (55 dk)","Kitaplar yanındaysa bazı adımlar kitabın belirli sayfalarına dönüşür"]}
 };
 function resting(){ return !!(S.settings.rest && S.settings.rest >= today()); }
-function basePace(){ return resting() ? 5 : (S.settings.pace || 45); }
+// Weekday pace + optional weekend pace (e.g. 90 / 180 for the June 2027 goal).
+function paceOn(d){ const w = new Date(d+"T12:00:00").getDay(); return (w===0 || w===6) && S.settings.wkend ? S.settings.wkend : (S.settings.pace || 45); }
+function avgPlan(){ const a = S.settings.pace || 45, b = S.settings.wkend || a; return Math.round((5*a + 2*b)/7); }
+function basePace(){ return resting() ? 5 : paceOn(today()); }
 function pace(){ const a = (S.done[today()]||{}).avail; return a || basePace(); }   // today's answer to "how much time do you have?" wins
 function itemsFor(p){ if(p<=5) return REST_ITEMS; const k = [20,45,60,90,180].filter(x=>x<=p).pop() || 20; return PACES[k].items; }
 const AVAIL = [[5,"5 dk"],[20,"20 dk"],[45,"45 dk"],[60,"1 saat"],[90,"1,5 saat"],[180,"3 saat"]];
 function setPace(p){ S.settings.pace = p; if(S.pack){ S.settings.packPerDay = p>=180 ? 20 : p>=90 ? 12 : p>=45 ? 5 : 3; } save(); }
-const REST_ITEMS = ["Sadece 2 dakikalık mini kartlar (5 kart). Seri bozulmaz.","Gramer, yazma ve bonus görevler bekleyebilir.","Kafan dinlenirken dizi izlersen +dk olarak ekleyebilirsin."];
+const REST_ITEMS = ["Sadece 5 dk: günün sahnesini dinle ve anla. Seri bozulmaz.","Gramer, yazma ve bonus görevler bekleyebilir.","Kafan dinlenirken dizi izlersen +dk olarak ekleyebilirsin."];
 function dayMin(d){ const l = (S.log||{})[d] || {};
   const est = (l.cards||0)*0.25 + (l.q||0)*0.5 + (l.sent||0)*1.5 + (l.lessons||0)*4;
-  return Math.max(l.min||0, est) + (l.ext||0); }
+  return Math.max(0, Math.max(l.min||0, est) + (l.ext||0)); }
 function baseHours(){
   if(!S.levels) return 0;
   const F = S.levelsF || {}, v = ["vocab","grammar","reading","listening"].map(k=>{ const L = S.levels[k] ?? -1, f = F[k];   // fine test value while it still matches the level
@@ -2307,18 +2310,21 @@ function paceCard(compact, noAvail){
     <div class="bar" style="margin:10px 0 8px"><i style="width:${Math.min(100, Math.round(100*today_m/p))}%"></i></div>
     <ul class="small" style="margin:0 0 8px;padding-left:20px">${items.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>
     ${(()=>{ const lp = levelProgress(); return lp ? `<div class="small" style="margin:4px 0 6px"><b>🧭 ${lp.lv} yolunun %${lp.pct}'ini geçtin.</b>${lp.wkH>=0.1?` Bu hafta ${lp.wkH.toFixed(1).replace(".",",")} saat çalıştın; bu, ${lp.lv} yolunun %${String(lp.wkPct).replace(".",",")}'i demek.`:""}</div><div class="bar" style="margin-bottom:8px"><i style="width:${lp.pct}%"></i></div>` : ""; })()}
-    <details style="margin:0 0 12px"><summary class="small">📈 Böyle giderse ne zaman? (gerçek verinle tahmin)</summary><div style="margin-top:8px">${forecastHTML(rest&&!avail ? (S.settings.pace||45) : p, true)}</div></details>
-    ${p<=5 ? `<div class="row" style="margin-bottom:8px"><a class="btn sm" href="#kelime/mini">2 dk kartlar</a>${rest?`<button class="btn ghost sm" data-unrest>Jüri modundan çık</button>`:""}</div>` : ""}
+    <details style="margin:0 0 12px"><summary class="small">📈 Böyle giderse ne zaman? (gerçek verinle tahmin)</summary><div style="margin-top:8px">${forecastHTML(avgPlan(), true)}</div></details>
+    ${p<=5 ? `<div class="row" style="margin-bottom:8px"><a class="btn sm" href="#sahne">5 dk sahne</a>${rest?`<button class="btn ghost sm" data-unrest>Jüri modundan çık</button>`:""}</div>` : ""}
     <div class="row"><span class="tiny">Uygulama dışında çalıştın mı? (dizi, kitap, ders)</span>${[10,20,30].map(n=>`<button class="chip" data-ext="${n}">+${n} dk</button>`).join("")}</div></div>`;
-  return `<div class="card stack"><div class="between"><h3 style="margin:0">⏱️ Tempo ve hedef tarihler</h3><span class="tag acc">${rest?"Jüri modu":PACES[p].n}</span></div>
-    <div class="row"><span class="small">Günde</span>${Object.keys(PACES).map(k=>`<button class="chip" data-pace="${k}" aria-pressed="${!rest && p===+k}">${+k>=180?"3 saat (kamp)":k+" dk"}</button>`).join("")}</div>
+  const wdP = S.settings.pace || 45, weP = S.settings.wkend || 0;
+  return `<div class="card stack"><div class="between"><h3 style="margin:0">⏱️ Tempo ve hedef tarihler</h3><span class="tag acc">${rest?"Jüri modu":(PACES[p]||PACES[45]).n}</span></div>
+    <div class="row"><span class="small">Hafta içi</span>${Object.keys(PACES).map(k=>`<button class="chip" data-pace="${k}" aria-pressed="${!rest && wdP===+k}">${+k>=180?"3 saat (kamp)":k+" dk"}</button>`).join("")}</div>
+    <div class="row"><span class="small">Hafta sonu</span><button class="chip" data-wkend="0" aria-pressed="${!weP}">Aynı</button>${[90,180].map(k=>`<button class="chip" data-wkend="${k}" aria-pressed="${weP===k}">${k>=180?"3 saat":"90 dk"}</button>`).join("")}<span class="tiny">Haftalık ortalama: ${avgPlan()} dk/gün</span></div>
     <ul class="small" style="margin:0;padding-left:20px">${items.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>
     <div class="card soft small" style="margin:0">${rest ? `🛡️ Jüri / sınav modu ${restEnd}'e kadar açık. Bitince ${S.settings.pace||45} dk tempona kendiliğinden dönersin. <button class="btn ghost sm" data-unrest>Şimdi çık</button>`
       : `🛡️ <b>Jüri ya da sınav haftası mı?</b> Hedefi 2 dakikaya indir, seri bozulmasın: <button class="btn sm" data-rest="7">1 hafta</button> <button class="btn sm" data-rest="14">2 hafta</button>`}</div>
     <div class="small muted">Toplam çalışma: <b>${Math.round(totalHours())} saat</b> (seviye testine göre başlangıç tahmini ${baseHours()} s + burada ${studiedHours().toFixed(1)} s)</div>
-    ${forecastHTML(S.settings.pace||45, false)}
+    ${goalHTML()}
+    ${forecastHTML(avgPlan(), false)}
     <button class="btn sm" data-fcoach>Bu analizi Claude'la derinleştir</button>
-    <div><div class="between small"><span>Bu hafta</span><span>${wk} / ${p*7} dk</span></div><div class="bar" style="margin-top:6px"><i style="width:${Math.min(100, Math.round(100*wk/(p*7)))}%"></i></div></div>
+    <div><div class="between small"><span>Bu hafta</span><span>${wk} / ${avgPlan()*7} dk</span></div><div class="bar" style="margin-top:6px"><i style="width:${Math.min(100, Math.round(100*wk/(avgPlan()*7)))}%"></i></div></div>
     <div class="row"><span class="tiny">Uygulama dışı çalışma ekle:</span>${[15,30,60].map(n=>`<button class="chip" data-ext="${n}">+${n} dk</button>`).join("")}</div>
     <p class="tiny" style="margin:0">Saatler Cambridge'in yaklaşık tahminleri (sıfırdan B1 ≈ 350–400 saat). Süre, uygulama açıkken ve sen etkileşimdeyken kendiliğinden sayılır. Dizi, kitap ve ders gibi dış çalışmayı elle eklersin. Kesinlik için 6 haftada bir seviye testini tekrarla.</p></div>`;
 }
@@ -2349,12 +2355,15 @@ function forecast(planMin){
 /* Target: abroad internship by June 2027 → B2 (B1+ with confident speaking is the minimum). */
 function goalHTML(){ const g = S.target || {date:"2027-06-01", lv:3}, left = Math.round((new Date(g.date+"T12:00:00") - new Date(today()+"T12:00:00"))/864e5);
   if(left<=0) return "";
-  const F = forecast(S.settings.pace||45), r = F.rows.find(x=>x.i===g.lv), b1 = F.rows.find(x=>x.i===g.lv-1);
+  const F = forecast(avgPlan()), r = F.rows.find(x=>x.i===g.lv), b1 = F.rows.find(x=>x.i===g.lv-1);
   if(!r || r.done) return `<div class="card soft small">🎯 Hedef ${LVN[g.lv]} saatlerine ulaştın 🎉 Şimdi konuşma pratiğine ağırlık ver.</div>`;
   const need = Math.ceil(r.hLeft*60/left), per = Math.round(F.per), ok = r.dAll<=left, near = !ok && per>=need*0.8;
+  // smallest weekday/weekend mix from the app's own tempo options that covers the need
+  const mixes = [[45,0],[60,0],[60,90],[90,0],[90,180],[180,0]].map(([a,b])=>[a,b,(5*a+2*(b||a))/7]), fit = mixes.find(x=>x[2]>=need) || mixes[mixes.length-1];
+  const isSet = (S.settings.pace||45)===fit[0] && (S.settings.wkend||0)===fit[1];
+  const mixTxt = `hafta içi ${fit[0]} dk${fit[1] ? `, hafta sonu ${fit[1]>=180?"3 saat":fit[1]+" dk"}` : ", hafta sonu da aynı"}`;
   const msg = ok ? `Bu hızla yetişiyorsun 🌱 Tahmin: ${dateIn(r.dAll)}.`
-    : near ? `Çok az kaldı. Hafta sonları biraz uzun çalışırsan yetişir.`
-    : `Şu hızla ${LVN[g.lv]}: ${dateIn(r.dAll)}${b1 && !b1.done && b1.dAll<=left ? `; Haziran'da ${LVN[g.lv-1]} olursun` : ""}. Yetişmek için: hafta içi 90 dk, hafta sonu 180 dk.`;
+    : `${near ? "Çok az kaldı." : `Şu hızla ${LVN[g.lv]}: ${dateIn(r.dAll)}${b1 && !b1.done && b1.dAll<=left ? `; Haziran'da ${LVN[g.lv-1]} olursun` : ""}.`} Yetişmek için: ${mixTxt}.${F.real!=null && avgPlan()>=need ? " Planın yetiyor; gerçek ortalaman plana yetişirse tamam." : isSet ? "" : ` <button class="btn sm" data-goalplan="${fit[0]}:${fit[1]}">Bu tempoyu kur</button>`}`;
   return `<div class="card"><div class="between"><b>🎯 Haziran 2027 · yurt dışı staj</b><span class="tag acc">${left} gün</span></div>
     <div class="small" style="margin-top:6px">Hedef <b>${LVN[g.lv]}</b>: ${Math.round(r.hLeft)} saat kaldı → günde ortalama <b>${need} dk</b>. Senin ortalaman: <b>${per} dk</b>${F.real==null ? " (seçtiğin süre; gerçek veri birkaç gün sonra)" : ""}.</div>
     <div class="small" style="margin-top:4px">${msg}</div>
@@ -2373,8 +2382,8 @@ function forecastHTML(planMin, compact){
     ${compact?"":`<p class="tiny" style="margin:0">Bu tarihler bir söz ya da baskı değil, bir pusula. Her çalıştığın gün tarih biraz öne gelir. "Tam ulaşmak" = o seviyenin çalışma saatini doldurmak <b>ve</b> o seviyeye kadarki tüm gramer derslerini geçmek. Hangisi daha geç biterse tarih odur. Seviye testini 6 haftada bir tekrarlarsan başlangıç tahmini de düzelir.</p>`}</div>`;
 }
 function forecastText(){
-  const F = forecast(S.settings.pace||45);
-  return `Gerçek ortalamam ${F.real!=null?F.real+" dk/gün (son "+F.span+" günün "+F.active+" günü çalıştım)":"henüz hesaplanamadı"}, seçtiğim tempo ${S.settings.pace||45} dk/gün, toplam tahmini çalışma ${Math.round(F.H)} saat, son 4 haftada ${F.lessons28} ders geçtim. Uygulamanın tahmini: ${F.rows.filter(r=>!r.done).map(r=>`${r.lv} ≈ ${dateIn(r.dAll)} (${Math.round(r.hLeft)} saat + ${r.lLeft} ders kaldı)`).join(", ")}.`;
+  const F = forecast(avgPlan());
+  return `Gerçek ortalamam ${F.real!=null?F.real+" dk/gün (son "+F.span+" günün "+F.active+" günü çalıştım)":"henüz hesaplanamadı"}, seçtiğim tempo hafta içi ${S.settings.pace||45} dk${S.settings.wkend?`, hafta sonu ${S.settings.wkend} dk`:""} (ortalama ${avgPlan()} dk/gün), hedefim Haziran 2027'de B2 (yurt dışı staj), toplam tahmini çalışma ${Math.round(F.H)} saat, son 4 haftada ${F.lessons28} ders geçtim. Uygulamanın tahmini: ${F.rows.filter(r=>!r.done).map(r=>`${r.lv} ≈ ${dateIn(r.dAll)} (${Math.round(r.hLeft)} saat + ${r.lLeft} ders kaldı)`).join(", ")}.`;
 }
 /* ---------- motivation helpers: mood check-in, never-resetting day count, why-reminder, progress-first framing ---------- */
 const MOODS = [["yorgun","😴 Yorgunum","Yorgunken 2 dakika bile sayılır. Sadece kartları aç; istersen orada bırak, bugün bu kadarı yeter."],
@@ -2390,7 +2399,7 @@ const MILES = [
   ["w25","🗂️","25 kelime iyi biliyorsun", s=>s.known>=25], ["w100","📚","100 kelime", s=>s.known>=100], ["w300","🧠","300 kelime", s=>s.known>=300],
   ["s10","✍️","İlk 10 cümle", s=>s.sent>=10], ["s100","📝","100 cümle", s=>s.sent>=100], ["h10","⏱️","10 saat çalışma", s=>s.hrs>=10], ["h50","⌛","50 saat çalışma", s=>s.hrs>=50]];
 function mileStats(){ let sent = 0; Object.values(S.log||{}).forEach(l=>sent += l.sent||0);
-  return {days: studyDays(), les: LESSONS.filter(l=>lessonPassed(l.id)).length, known: Object.values(S.cards).filter(c=>c.box>=3).length, sent, hrs: studiedHours()}; }
+  return {days: studyDays(), les: LESSONS.filter(l=>lessonPassed(l.id)).length, known: Object.values(S.cards).filter(c=>c.box>=3).length + Object.values(S.ph||{}).filter(x=>x.box>=2).length, sent, hrs: studiedHours()}; }
 function newMiles(){ const st = mileStats(), seen = S.miles = S.miles || {}; const got = MILES.filter(m=>m[3](st) && !seen[m[0]]); got.forEach(m=>seen[m[0]] = today()); if(got.length) save(); return got; }
 function badgesHTML(){ const seen = S.miles||{}; return `<div class="row">${MILES.map(m=>`<span class="chip" title="${esc(m[2])}" style="${seen[m[0]]?"":"opacity:.35;filter:grayscale(1)"}">${m[1]} ${esc(m[2])}</span>`).join("")}</div>`; }
 /* Habits and error patterns from the event log (last 28 days). */
@@ -2423,7 +2432,7 @@ function behaviour(){
     bosGunSerileri: gaps, suankiBosGun: run, son300Olay: (S.ev||[]).slice(-300)}; }
 /* Plain-text progress summary written to the user's Drive for the weekly planning agent. Stats only, no sentences or names. */
 function progressReport(){
-  const t = today(), L = S.levels || {}, F = forecast(S.settings.pace||45), P = Object.values(phS()), done = scS();
+  const t = today(), L = S.levels || {}, F = forecast(avgPlan()), P = Object.values(phS()), done = scS();
   const days = []; for(let i=27;i>=0;i--){ const d = addDays(t,-i); days.push(Math.round(dayMin(d))); }
   const st = {new:0, known:0, use:0}; P.forEach(x=>{ const s = phStatus(x); if(st[s]!=null) st[s]++; });
   const steps = {}; for(let i=0;i<14;i++){ const v = (S.done||{})[addDays(t,-i)]; if(v && v.st) Object.keys(v.st).forEach(k=>steps[k] = (steps[k]||0)+1); if(v && v.gram) steps.gram = (steps.gram||0)+1; }
@@ -2462,6 +2471,8 @@ function moodCard(){
 function paceClick(e, redraw){
   const md = e.target.closest("[data-mood]"); if(md){ const d = fd(), k = md.dataset.mood; d.mood = d.mood===k ? undefined : k; if(!d.mood) delete d.mood; if((k==="yorgun"||k==="zor") && d.mood && !d.avail) d.avail = 5; save(); redraw(); return true; }
   const av = e.target.closest("[data-avail]"); if(av){ const d = fd(), n = +av.dataset.avail; d.avail = d.avail===n ? undefined : n; if(d.avail===undefined) delete d.avail; save(); redraw(); return true; }
+  const wk = e.target.closest("[data-wkend]"); if(wk){ const n = +wk.dataset.wkend; if(n) S.settings.wkend = n; else delete S.settings.wkend; save(); redraw(); toast(n ? `Hafta sonu: ${n>=180?"3 saat":n+" dk"}` : "Hafta sonu da aynı tempo"); return true; }
+  const gp = e.target.closest("[data-goalplan]"); if(gp){ const [a,b] = gp.dataset.goalplan.split(":").map(Number); setPace(a); if(b) S.settings.wkend = b; else delete S.settings.wkend; delete S.settings.rest; save(); redraw(); toast("Haziran tempon kuruldu ✓"); return true; }
   const pc = e.target.closest("[data-pace]"); if(pc){ setPace(+pc.dataset.pace); delete S.settings.rest; save(); redraw(); toast("Tempo: "+PACES[+pc.dataset.pace].n); return true; }
   const rs = e.target.closest("[data-rest]"); if(rs){ S.settings.rest = addDays(today(), +rs.dataset.rest - 1); save(); redraw(); toast("Jüri modu açık. Günde 2 dk yeter 🛡️"); return true; }
   if(e.target.closest("[data-fcoach]")){ bridge("Hedef tarih analizi → Claude", P.coach() + "\n\nÖZELLİKLE: Yukarıdaki TEMPO VE TAHMİN satırına bak. Bu tahmin gerçekçi mi? Akademik takvimimi (jüri ve sınav haftaları) hesaba katarak B1 ve B2 için ay ay bir plan çıkar; hangi beceride hızlanabileceğimi söyle.", {save:t=>{ S.coach = S.coach||[]; S.coach.push({date:today(), text:t}); save(); redraw(); }, tip:"Cevabı buraya yapıştırırsan Rehber'de koç notu olarak saklanır."}); return true; }
@@ -3078,7 +3089,7 @@ function vTodayOld(m){
     <div class="body"><div class="between"><h3>${task.icon} ${esc(task.title)}</h3><span class="tiny">${task.min} dk · <span class="tag">${task.tag}</span></span></div>
     <ol class="small">${task.steps.map(s=>`<li>${s}</li>`).join("")}</ol>
     <div class="row">${task.actions}</div></div></div>
-  <div class="card"><div class="between"><div><h3 style="margin:0">Bugün hiç vaktin yok mu?</h3><div class="small muted">2 dakikalık mini versiyon: sadece 5 kart. Zinciri kırmamaya yeter.</div></div><a class="btn" href="#kelime/mini">2 dk</a></div></div>
+  <div class="card"><div class="between"><div><h3 style="margin:0">Bugün hiç vaktin yok mu?</h3><div class="small muted">5 dakikalık mini versiyon: sadece günün sahnesini dinle. Zinciri kırmamaya yeter.</div></div><button class="btn" data-avail="5">5 dk</button></div></div>
   <h2>Haftalık ritim</h2>
   <div class="card small" style="padding:6px 18px">${[1,2,3,4,5,6,0].map(x=>{ const k=DAYPLAN[x]; const lab={grammar:"🧩 Gramer",reading:"📖 Okuma",listening:"🎧 Dinleme",writing:"✍️ Yazma",speaking:"🗣️ Konuşma",fun:"🍿 Keyif günü (dizi, şarkı)",review:"🌿 Hafif tekrar / dinlen"}[k];
     return `<div class="between" style="padding:7px 0;${x!==1?"border-top:1px solid var(--line)":""}${x===dow?";font-weight:600;color:var(--accent)":""}"><span>${DOW[x]}</span><span>${lab}</span></div>`; }).join("")}</div>
