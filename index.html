@@ -831,7 +831,11 @@ function mergeState(L, R){
 }
 const Sync = (()=>{
   // appdata: the hidden sync file · drive.file: only files this app creates (the visible progress report for the weekly agent)
-  const SCOPE = "https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/drive.file";
+  // Silent refresh (prompt=none) must ask only for what was already granted: asking for the new drive.file
+  // scope silently fails with consent_required and used to stop sync (and bounce to Google on every open).
+  const S_APP = "https://www.googleapis.com/auth/drive.appdata", S_FILE = "https://www.googleapis.com/auth/drive.file", SCOPE = S_APP + " " + S_FILE;
+  const hasFile = ()=>String(lsGet(K0()+"scopes", "")).includes("drive.file");
+  function K0(){ return KEY+":g"; }
   const K = KEY+":g";
   let busy = false, again = false, dirtyFlag = false, state = "off", lastAt = 0, errMsg = "", timer = null;
   const tok = ()=>{ const t = lsGet(K+"tok", null); return t && t.e > Date.now()+60e3 ? t.t : null; };
@@ -845,7 +849,7 @@ const Sync = (()=>{
   function setState(s, msg){ state = s; errMsg = msg||""; paint(); }
   function connect(silent){
     const st = Math.random().toString(36).slice(2); lsSet(K+"state", st); lsSet(K+"try", Date.now());
-    const q = {client_id:GOOGLE_CLIENT_ID, redirect_uri:redirectUri(), response_type:"token", scope:SCOPE, include_granted_scopes:"true", state:st+"|"+(location.hash||"#ben")};
+    const q = {client_id:GOOGLE_CLIENT_ID, redirect_uri:redirectUri(), response_type:"token", scope: silent && !hasFile() ? S_APP : SCOPE, include_granted_scopes:"true", state:st+"|"+(location.hash||"#ben")};
     if(silent) q.prompt = "none";
     location.assign("https://accounts.google.com/o/oauth2/v2/auth?"+new URLSearchParams(q));
   }
@@ -858,7 +862,7 @@ const Sync = (()=>{
     history.replaceState(null, "", location.pathname + (back && back.startsWith("#") && !back.includes("access_token") ? back : "#ben"));
     if(st !== lsGet(K+"state", null)) return;
     lsSet(K+"state", null);
-    if(q.get("access_token")){ lsSet(K+"tok", {t:q.get("access_token"), e:Date.now()+(+q.get("expires_in")||3600)*1000}); if(!on()){ lsSet(K+"on", true); setTimeout(()=>toast("Google Drive bağlandı ☁️"), 500); } }
+    if(q.get("access_token")){ lsSet(K+"tok", {t:q.get("access_token"), e:Date.now()+(+q.get("expires_in")||3600)*1000}); lsSet(K+"scopes", q.get("scope")||""); lsSet(K+"repErr", null); if(!on()){ lsSet(K+"on", true); setTimeout(()=>toast("Google Drive bağlandı ☁️"), 500); } }
     else if(!/interaction_required|login_required|consent_required/.test(q.get("error"))) setTimeout(()=>toast("Google bağlantısı kurulamadı: "+q.get("error")), 600);
   }
   function disconnect(){ const t = lsGet(K+"tok", null); if(t) fetch("https://oauth2.googleapis.com/revoke?token="+encodeURIComponent(t.t), {method:"POST"}).catch(()=>{}); lsSet(K+"tok", null); lsSet(K+"on", false); setState("off"); }
@@ -914,7 +918,7 @@ const Sync = (()=>{
       if(after !== before){ S = merged; saveLocal(); applyTheme(); const a = document.activeElement; if(!a || !/^(INPUT|TEXTAREA)$/.test(a.tagName)) render(); }
       if(!remote || after !== JSON.stringify(remote) || dirtyFlag){ dirtyFlag = false; await put(JSON.stringify(S), f && f.id); }
       lastAt = Date.now(); setState("ok");
-      report().catch(()=>{}); note().catch(()=>{});
+      if(hasFile()){ report().catch(()=>{}); note().catch(()=>{}); }
     }catch(e){
       setState(e && e.code==="auth" ? "auth" : e && e.code==="offline" ? "offline" : "error", e && e.message || "");
     }finally{ busy = false; if(again){ again = false; setTimeout(run, 500); } }
@@ -927,12 +931,15 @@ const Sync = (()=>{
     if(!tok() && navigator.onLine && Date.now() - lsGet(K+"try", 0) > 120e3){ connect(true); return; }
     run();
     setInterval(()=>{ if(document.visibilityState==="visible") run(); }, 60e3);
-    document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="hidden"){ if(dirtyFlag) run(); } else run(); });
+    // back to the app with an expired token (tokens last 1 h): refresh silently then, not in the middle of an exercise
+    document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="hidden"){ if(dirtyFlag) run(); }
+      else if(!tok() && navigator.onLine && Date.now() - lsGet(K+"try", 0) > 120e3){ saveLocal(); connect(true); } else run(); });
     window.addEventListener("online", run);
   }
-  const rep = ()=>({at: lsGet(K+"repAt", 0), err: lsGet(K+"repErr", null)});
+  const rep = ()=>({at: lsGet(K+"repAt", 0), err: !hasFile() || lsGet(K+"repErr", null)});
   const noteGet = ()=>({txt: lsGet(K+"noteTxt", ""), isNew: !!lsGet(K+"noteNew", false)}), noteSeen = ()=>lsSet(K+"noteNew", false);
-  return {on, connect, disconnect, handleRedirect, run, dirty, start, text, paint, rep, noteGet, noteSeen};
+  const needsAuth = ()=>on() && !tok();
+  return {on, connect, disconnect, handleRedirect, run, dirty, start, text, paint, rep, noteGet, noteSeen, needsAuth};
 })();
 
 /* ================= HELPERS ================= */
@@ -3553,7 +3560,7 @@ function vMe(m){
    <p class="small muted" style="margin:0">İlerlemen kendi Google Drive'ında, sadece bu uygulamanın görebildiği gizli bir klasörde saklanır. Telefonda ve bilgisayarda aynı Google hesabıyla bağlan; ikisi de aynı verileri görür. Bir cihazda internet yoksa, bağlanınca kendiliğinden eşitlenir.</p>
    ${Sync.on() ? (()=>{ const r = Sync.rep(); return `<div class="small">${r.err ? `📊 Haftalık plan ajanı ilerlemeni göremiyor. Bir kez yeniden bağlan (yeni izin: sadece bu uygulamanın oluşturduğu dosya). <button class="btn sm" data-gconnect>Yeniden bağlan</button>`
      : r.at ? `📊 Haftalık plan ajanı için özet rapor Drive'ında: <i>ingilizce-defteri-ilerleme.txt</i> · ${new Date(r.at).toLocaleString("tr-TR",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}` : `📊 Özet rapor ilk eşitlemede Drive'ına yazılacak.`}</div>`; })() : ""}
-   <div class="row">${Sync.on() ? `<button class="btn" data-sync>Şimdi eşitle</button><button class="btn ghost" data-unsync>Bağlantıyı kes</button>` : `<button class="btn primary" data-gconnect>Google Drive'a bağlan</button>`}</div></div>
+   <div class="row">${Sync.on() ? `<button class="btn ${Sync.needsAuth() ? "primary" : ""}" data-sync>${Sync.needsAuth() ? "Yeniden bağlan ve eşitle" : "Şimdi eşitle"}</button><button class="btn ghost" data-unsync>Bağlantıyı kes</button>` : `<button class="btn primary" data-gconnect>Google Drive'a bağlan</button>`}</div></div>
   <div class="card stack"><p class="small muted" style="margin:0">Ek güvence: ara sıra yedek dosyası indirebilirsin.</p>
    <div class="row"><button class="btn" data-exp>Yedeği indir</button><label class="btn">Yedekten yükle<input type="file" accept="application/json" data-imp hidden></label></div>
    <div class="row"><span class="small">Görünüm</span>${[["","Otomatik"],["light","Açık"],["dark","Koyu"]].map(([k,l])=>`<button class="chip" data-th="${k}" aria-pressed="${(S.settings.theme||"")===k}">${l}</button>`).join("")}</div>
@@ -3564,7 +3571,7 @@ function vMe(m){
     const th = e.target.closest("[data-th]"); if(th){ S.settings.theme = th.dataset.th; save(); applyTheme(); vMe(m); return; }
     const rt = e.target.closest("[data-rate]"); if(rt){ S.settings.rate = +rt.dataset.rate; save(); speak("This is how fast I will speak."); vMe(m); return; }
     if(e.target.closest("[data-gconnect]")){ Sync.connect(false); return; }
-    if(e.target.closest("[data-sync]")){ Sync.run(); return; }
+    if(e.target.closest("[data-sync]")){ if(Sync.needsAuth()){ saveLocal(); Sync.connect(false); } else Sync.run(); return; }
     if(e.target.closest("[data-unsync]")){ if(confirm("Bu cihazın Drive bağlantısı kesilecek. Veriler bu cihazda ve Drive'da kalır.")){ Sync.disconnect(); vMe(m); } return; }
     if(e.target.closest("[data-reset]")){ if(confirm("Tüm ilerleme, kartlar ve yazılar silinecek"+(Sync.on()?" (Drive'daki kopya dahil)":"")+". Emin misin? (Önce yedek almanı öneririm.)")){ S = fresh(); S.resetAt = Date.now(); save(); location.hash="#bugun"; render(); } }
   };
