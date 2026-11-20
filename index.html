@@ -2237,7 +2237,8 @@ function dayMin(d){ const l = (S.log||{})[d] || {};
   return Math.max(l.min||0, est) + (l.ext||0); }
 function baseHours(){
   if(!S.levels) return 0;
-  const v = ["vocab","grammar","reading","listening"].map(k=>S.levels[k] ?? -1), avg = v.reduce((a,b)=>a+b,0)/v.length;
+  const F = S.levelsF || {}, v = ["vocab","grammar","reading","listening"].map(k=>{ const L = S.levels[k] ?? -1, f = F[k];   // fine test value while it still matches the level
+    return f!=null && Math.max(-1, Math.min(4, Math.floor(f + 0.3)))===L ? Math.min(f, L + 0.7) : L; }), avg = v.reduce((a,b)=>a+b,0)/v.length;
   if(avg<0) return Math.round(100*(avg+1));
   const lo = Math.floor(avg), hi = Math.min(4, lo+1);
   return Math.round(LV_HOURS[lo] + (LV_HOURS[hi]-LV_HOURS[lo])*(avg-lo));
@@ -2767,8 +2768,8 @@ function vTest(m){
     if(e.target.closest("[data-quit]")){ T = null; return; }
     if(e.target.closest("[data-next]")){ T.i++; vTest(m); return; }
     const o = e.target.closest("[data-k]");
-    if(o){ T.ans[T.i] = +o.dataset.k === it.a; T.i++; vTest(m); return; }
-    if(e.target.closest("[data-skipsec]")){ const sec = it.sec; while(T.i<T.q.length && T.q[T.i].sec===sec){ T.ans[T.i]=false; T.i++; } vTest(m); return; }
+    if(o){ const k = +o.dataset.k; T.ans[T.i] = k===it.a ? 1 : k<0 ? 0 : -1; T.i++; vTest(m); return; }   // 1 right · 0 "Bilmiyorum" · -1 wrong
+    if(e.target.closest("[data-skipsec]")){ const sec = it.sec; while(T.i<T.q.length && T.q[T.i].sec===sec){ T.ans[T.i]=0; T.i++; } vTest(m); return; }
     if(e.target.closest("[data-selfnext]")){
       T.self[it.sec] = [...m.querySelectorAll("input:checked")].map(c=>+c.dataset.l);
       T.i++;
@@ -2776,21 +2777,23 @@ function vTest(m){
     }
   };
 }
+/* Scoring. Old rule ("≥50% right at a level, stop at the first miss") let lucky guesses pass a level: in a simulation
+   it found the true level only 30–40% of the time. Now: each wrong answer cancels a lucky guess (right − wrong/(options−1)),
+   every level adds 0–1 to a continuous score, and a level counts once ~70% of it is shown. Simulated accuracy 56–72%,
+   almost never 2 levels off. "Bilmiyorum" is never punished. levelsF keeps the fine value for the hour estimate. */
+function testLevel(cells){ const s = cells.reduce((a,c)=>a + Math.min(1, Math.max(0, c)), 0), f = s - 1;
+  return {lv: Math.max(-1, Math.min(4, Math.floor(f + 0.3))), f: Math.round(f*100)/100}; }
 function finishTest(){
-  const res = {};
+  const res = {}, fine = {};
   ["vocab","grammar","reading","listening"].forEach(sec=>{
-    const by = [0,0,0,0,0].map(()=>({n:0,ok:0}));
-    T.q.forEach((x,i)=>{ if(x.sec===sec && x.type==="mc"){ by[x.lv].n++; if(T.ans[i]) by[x.lv].ok++; } });
-    let lv = -1;
-    for(let l=0;l<5;l++){ if(by[l].n && by[l].ok/by[l].n >= 0.5) lv = l; else break; }
-    res[sec] = lv;
+    const by = [0,0,0,0,0].map(()=>({n:0, ok:0, bad:0, k:4}));
+    T.q.forEach((x,i)=>{ if(x.sec===sec && x.type==="mc"){ const b = by[x.lv]; b.n++; b.k = x.o.length; if(T.ans[i]===1 || T.ans[i]===true) b.ok++; else if(T.ans[i]===-1) b.bad++; } });
+    const r = testLevel(by.map(b=>b.n ? (b.ok - b.bad/Math.max(1, b.k-1))/b.n : 0)); res[sec] = r.lv; fine[sec] = r.f;
   });
-  ["writing","speaking"].forEach(sec=>{
-    const c = T.self[sec]; let lv = -1;
-    for(let l=0;l<5;l++){ if(c.includes(l)) lv = l; else break; }
-    res[sec] = lv;
+  ["writing","speaking"].forEach(sec=>{   // both statements of a level = full, one = half
+    const c = T.self[sec], r = testLevel([0,1,2,3,4].map(l=>c.filter(x=>x===l).length/2)); res[sec] = r.lv; fine[sec] = r.f;
   });
-  S.levels = res; S.testDate = today(); S.history.push({date:today(), levels:res}); S.onboarded = true;
+  S.levels = res; S.levelsF = fine; S.testDate = today(); S.history.push({date:today(), levels:res}); S.onboarded = true;
   save(); T = null; location.hash = "#sonuc";
 }
 
@@ -2813,7 +2816,11 @@ function vResult(m){
    <textarea id="pw" rows="4" lang="en" placeholder="My name is ..."></textarea>
    <div class="row" style="margin-top:8px"><button class="btn" id="pwb">Claude'a değerlendirt</button></div></div>
   <a class="btn primary block" href="#bugun">Planıma git</a>
-  <p class="tiny" style="text-align:center">Daha resmi bir ölçüm istersen ücretsiz <a href="https://www.efset.org/" target="_blank" rel="noopener">EF SET</a> testini de yapabilirsin. 6–8 hafta sonra buradaki testi tekrarla, farkı görürsün.</p>`;
+  <div class="card soft small"><b>Bu test ne kadar hassas?</b> Kelime ve gramerde seviye başına 4 soru var; sonuç genelde doğru, en fazla 1 seviye sapar. Okuma ve dinlemede seviye başına 2 soru var; ±1 seviye olabilir. Daha kesin sonuç için ücretsiz <a href="https://www.efset.org/" target="_blank" rel="noopener">EF SET</a> (50 dk, okuma + dinleme, staj başvurusunda gösterilebilir sertifika) yap ve sonucunu buraya gir:
+   <div class="row" style="margin-top:8px;gap:6px;flex-wrap:wrap">Okuma <select id="efr"><option value="">–</option>${LV.map((l,i)=>`<option value="${i}">${l}</option>`).join("")}</select> Dinleme <select id="efl"><option value="">–</option>${LV.map((l,i)=>`<option value="${i}">${l}</option>`).join("")}</select><button class="btn sm" id="efb">Kaydet</button></div>
+   <div class="tiny" style="margin-top:4px">6–8 hafta sonra buradaki testi tekrarla, farkı görürsün.</div></div>`;
+  $("#efb").onclick = ()=>{ let n = 0; [["efr","reading"],["efl","listening"]].forEach(([id,k])=>{ const v = $("#"+id).value; if(v!==""){ S.levels[k] = +v; S.levelsF = S.levelsF||{}; S.levelsF[k] = +v + 0.5; n++; } });
+    if(!n){ toast("Önce seviye seç"); return; } S.history.push({date:today(), levels:Object.assign({}, S.levels), src:"efset"}); save(); toast("EF SET sonucun kaydedildi ✓"); vResult($("#main")); };
   $("#pwb").onclick = ()=>{ const t=$("#pw").value.trim(); if(!t){ toast("Önce birkaç cümle yaz"); return; } bridge("Yazma seviyeni ölç", P.placement(t)); };
 }
 
