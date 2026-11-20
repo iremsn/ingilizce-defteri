@@ -1,5 +1,5 @@
 /* İngilizce Defteri offline cache: app files network-first, cache as fallback. */
-const VERSION = "id-v19";
+const VERSION = "id-v20";
 const APP = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png", "./apple-touch-icon.png"];
 
 self.addEventListener("install", e => {
