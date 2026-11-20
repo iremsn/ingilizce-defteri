@@ -1318,11 +1318,13 @@ function todaySteps(){
   const steps = [];
   tpl.forEach(([k, min, blk])=>{
     let s = null;
-    if(k==="scene2"){ const sc = sceneToday(2);
+    if(k==="scene2" && brakeToday()) s = {n:"Tekrar turu", ic:"🔁", d:`Bugün yeni sahne yok: ${Math.min(duePhrases(999).length, reCap(p))} eski ifadeyi yeni cümlelerde hatırla`, href:"#sahne/tekrar", at:["#sahne/tekrar"], done: stepGet("scene2"),
+      todo:"Tekrar birikmiş. Önce eskileri oturt; yarın yeni sahne geri gelir. Her biri 15–20 saniye."};
+    else if(k==="scene2"){ const sc = sceneToday(2);
       s = {n:"İkinci sahne", ic:"🎬", d: `${sc.ic} ${sc.t} · ${sc.ph.length} yeni ifade daha`, href:"#sahne/ikinci", at:["#sahne/ikinci"], done: stepGet("scene2"),
         todo: `Aynı akış: dinle → anla → ${sc.ph.length} ifadeyi kendi hayatına uydur. Bugün toplam ${sceneToday().ph.length + sc.ph.length} yeni ifade.`}; }
     if(k==="scene"){ const sc = sceneToday(), nRe = duePhrases(9).length;
-      s = {n:"Günün sahnesi", ic:"🎬", d: `${sc.ic} ${sc.t}${p<=5 ? " · sadece dinle ve anla" : ` · ${sc.ph.length} yeni ifade${nRe ? ` + ${Math.min(nRe, p>=90?4:2)} eski ifadeyle yeniden karşılaşma` : ""}`}`, href:"#sahne", at:["#sahne"], done: stepGet("scene"),
+      s = {n:"Günün sahnesi", ic:"🎬", d: `${sc.ic} ${sc.t}${p<=5 ? " · sadece dinle ve anla" : brakeLv()===2 && scS()[sc.id] ? " · tanıdık sahne: tekrar birikti, bugün yeni ifade yok" : ` · ${sc.ph.length} yeni ifade${nRe ? ` + ${Math.min(nRe, reShare("scene"))} eski ifadeyle yeniden karşılaşma` : ""}`}`, href:"#sahne", at:["#sahne"], done: stepGet("scene"),
         todo: p<=5 ? "Önce sadece dinle, sonra 3 kısa soru. Bu kadar." : "Önce sadece dinle → 3 soruyla ne olduğunu anla → 3 ifadeyi kendi hayatına uydur (yaz ya da söyle) → eski ifadeleri yeni cümlede hatırla."}; }
     if(k==="exam") s = {n:"Sınav modu", ic:"🎓", d:"10 eş anlamlı sorusu, cümle içinde (İTÜ tarzı)", href:"#sinav", at:["#sinav"], done: stepGet("exam"), todo:"Cümledeki renkli ifadenin yerine hangisi gelir? Seç; sonra gruptaki diğerlerini gör."};
     if(k==="cards") s = {n:"Kelime kartları", ic:"🗂️", d: nCards ? `${nCards} kart: tekrarlar ve yeni kelimeler` : "Bugünlük kart kalmadı", href:"#kelime/akis", done: !!d.cards || !nCards};
@@ -1633,9 +1635,20 @@ function sceneToday(slot){ const d = fd(), f = slot===2 ? "scene2" : "scene", ot
   if(d[f] && SAHNE.find(s=>s.id===d[f])) return SAHNE.find(s=>s.id===d[f]);
   if(slot===2 && !d.scene) sceneToday(1);
   const done = scS(), pool = SAHNE.filter(s=>s.id!==(slot===2 ? d.scene : other));
-  const nx = pool.find(s=>!done[s.id]) || pool.slice().sort((a,b)=>((done[a.id]||{}).d||"")<((done[b.id]||{}).d||"")?-1:1)[0] || SAHNE[0];
+  const nx = (brakeLv()<2 && pool.find(s=>!done[s.id])) || pool.slice().sort((a,b)=>((done[a.id]||{}).d||"")<((done[b.id]||{}).d||"")?-1:1)[0] || SAHNE[0];
   d[f] = nx.id; saveLocal(); return nx; }
-function duePhrases(n){ const t = today(); return Object.entries(phS()).filter(([id,x])=>PHR[id] && x.due<=t && x.d0!==t).sort((a,b)=>a[1].due<b[1].due?-1:a[1].box-b[1].box).slice(0, n).map(([id])=>id); }
+/* Review budget. A phrase answered right comes back after 1, 3, 7, 21, 60 days: ~5 reviews in its first 3 months,
+   so 10 new a day settles at ~50 reviews a day (~15 min). The cap keeps a day doable; when the pile is bigger
+   than the cap at the start of the day, the second scene turns into a review round (new phrases slow down by themselves).
+   One-year simulation (85% right): without the brake 45-min days pile up 1,300+ unreviewed phrases and only ~700 stick;
+   with it ~1,150 stick (60 min ~1,350, 90 min ~1,850, 180 min ~2,600). A phrase is "settled" after its 60-day review and leaves the queue.
+   Level 1 (pile > cap): second scene → review round. Level 2 (pile > 3×cap): first scene also replays a known scene (no new phrases). */
+function reCap(p){ return p<45 ? 4 : p<60 ? 25 : p<90 ? 30 : p<180 ? 40 : 60; }
+function brakeLv(){ const d = fd(); if(d.brake==null){ const n = duePhrases(9999).length, c = reCap(pace()); d.brake = n > 3*c ? 2 : n > c ? 1 : 0; saveLocal(); } return d.brake; }
+function brakeToday(){ return brakeLv() > 0; }
+function reShare(key){ const c = reCap(pace()), two = planOf(pace()).some(x=>x[0]==="scene2");
+  return !two ? c : key==="scene" ? (brakeToday() ? Math.ceil(c/4) : Math.ceil(c/2)) : c; }
+function duePhrases(n){ const t = today(); return Object.entries(phS()).filter(([id,x])=>PHR[id] && x.box<5 && x.due<=t && x.d0!==t).sort((a,b)=>a[1].due<b[1].due?-1:a[1].box-b[1].box).slice(0, n).map(([id])=>id); }
 // two (or three) different voices for the characters
 function sayAs(text, who, slow, onend){
   if(!("speechSynthesis" in window)){ onend && onend(); return; }
@@ -1684,14 +1697,16 @@ function vScene(m, sub){
   if(sub==="konus"){ const sc = sceneToday(); m.innerHTML = `<a class="btn ghost" href="#bugun">‹ Bugün</a><h1>💬 ${esc(sc.t)}</h1><p class="sub">Bugünkü sahneyi Claude'la canlandır. Konuşmayı kesmez, sonda geri bildirim verir.</p><button class="btn primary block" data-rp>Komutu aç</button>`;
     const open = ()=>bridge("Sahneyi Claude'la konuş", scenePrompt(sc), {save: scenePaste, tip:"Sohbetin sonunda Claude'un özetini buraya yapıştırırsan, kullandığın ifadeleri sayarım."});
     m.onclick = e=>{ if(e.target.closest("[data-rp]")) open(); }; open(); return; }
-  const two = sub==="ikinci", KEY = two ? "scene2" : "scene"; if(two) sub = "";
-  const sc = sub && SAHNE.find(s=>s.id===sub) || sceneToday(two ? 2 : 1);
+  const sub0 = sub, RV = sub==="tekrar", two = sub==="ikinci" || RV, KEY = two ? "scene2" : "scene"; if(two) sub = "";
+  const sc = RV ? {id:"_tekrar", t:"Tekrar turu", ic:"🔁", top:"Eski ifadeler", ph:[], q:[], l:[], who:{}} : sub && SAHNE.find(s=>s.id===sub) || sceneToday(two ? 2 : 1);
   if(!SCN || SCN.id!==sc.id || SCN.day!==today()) SCN = {id:sc.id, day:today(), st:"listen", show:false, tr:{}, qi:0, a:{}, ok:0, pi:0, said:false, re:null, ri:0, rok:0, hint:false, res:null};
+  if(RV && SCN.st==="listen"){ SCN.re = duePhrases(reShare(KEY)); SCN.st = SCN.re.length ? "re" : "end";
+    if(!SCN.re.length && todaySteps().some(s=>s.k===KEY && !s.done)) markStep(KEY, true); }
   const short = pace()<=5 && !sub, lv = SAHNE.indexOf(sc)+1;
   const head = `<div class="between"><a class="btn ghost" href="${sub ? "#sahne/liste" : "#bugun"}">‹ ${sub ? "Sahneler" : "Plan"}</a><span class="tag acc">${esc(sc.top)}</span></div>
-    <div class="tiny" style="margin-top:10px">SAHNE ${lv}/${SAHNE.length}</div><h1 style="margin-top:2px">${sc.ic} ${esc(sc.t)}</h1>`;
+    <div class="tiny" style="margin-top:10px">${RV ? "YENİ SAHNE YOK BUGÜN · ÖNCE ESKİLERİ OTURT" : `SAHNE ${lv}/${SAHNE.length}`}</div><h1 style="margin-top:2px">${sc.ic} ${esc(sc.t)}</h1>`;
   const steps = ["Dinle","Anla","Kullan","Hatırla"], si = {listen:0, disc:1, use:2, re:3, end:4}[SCN.st];
-  const dots = `<div class="row" style="gap:6px;margin:-4px 0 12px">${steps.map((s,i)=>`<span class="tag ${i===si?"acc":""}" style="${i<si?"opacity:.55":""}">${i<si?"✓ ":""}${s}</span>`).join("")}</div>`;
+  const dots = RV ? "" : `<div class="row" style="gap:6px;margin:-4px 0 12px">${steps.map((s,i)=>`<span class="tag ${i===si?"acc":""}" style="${i<si?"opacity:.55":""}">${i<si?"✓ ":""}${s}</span>`).join("")}</div>`;
   const lineHTML = (L, i, hl)=>{ const [w, en, tr] = L; let t = esc(en); if(hl) t = t.replace(esc(hl), `<b style="color:var(--accent)">${esc(hl)}</b>`);
     return `<div class="sl" data-li="${i}" style="padding:8px 0;border-top:${i?"1px solid var(--line)":"0"}"><div class="between"><span class="tiny"><b>${esc(sc.who[w])}</b></span><span class="row" style="gap:4px"><button class="btn ghost sm" data-pl="${i}" aria-label="Bu satırı dinle">${ICON.play}</button><button class="btn ghost sm" data-tr="${i}" aria-label="Türkçesi">🇹🇷</button></span></div>
       <div lang="en" style="${SCN.st!=="listen" || SCN.show ? "" : "filter:blur(6px);cursor:pointer;user-select:none"}" data-rv>${t}</div>${SCN.tr[i] ? `<div class="small muted">${esc(tr)}</div>` : ""}</div>`; };
@@ -1731,18 +1746,18 @@ function vScene(m, sub){
        : `<div class="row" style="margin-top:8px">${SR ? `<button class="btn ghost" data-rmic>🎙️</button>` : ""}<button class="btn primary" data-rc>Kontrol et</button>${SCN.hint ? "" : `<button class="btn ghost" data-hint>İpucu</button>`}</div>`}</div>`;
   }
   if(SCN.st==="end"){ const mine = sc.ph.map(p=>(phS()[p.id]||{}).mine).filter(Boolean).map(a=>a.slice(-1)[0]);
-    body = `<div class="card" style="text-align:center"><div style="font-size:40px">${sc.ic}</div><h2 style="margin:6px 0">Bu sahneyi anladın ✓</h2>
-      <div class="small muted">${SCN.ok}/${sc.q.length} soruyu ilk denemede bildin${SCN.re && SCN.re.length ? ` · ${SCN.rok}/${SCN.re.length} eski ifadeyi hatırladın` : ""}.</div>
-      ${short ? "" : `<div class="small" style="margin-top:8px">Yeni ifadelerin: ${sc.ph.map(p=>`<b lang="en">${esc(p.p)}</b>`).join(" · ")}</div>`}</div>
+    body = `<div class="card" style="text-align:center"><div style="font-size:40px">${sc.ic}</div><h2 style="margin:6px 0">${RV ? "Tekrar tamam ✓" : "Bu sahneyi anladın ✓"}</h2>
+      <div class="small muted">${RV ? (SCN.re && SCN.re.length ? `${SCN.rok}/${SCN.re.length} eski ifadeyi hatırladın. Yarın yeni sahne gelir.` : "Bugün tekrar edecek ifade kalmadı.") : `${SCN.ok}/${sc.q.length} soruyu ilk denemede bildin${SCN.re && SCN.re.length ? ` · ${SCN.rok}/${SCN.re.length} eski ifadeyi hatırladın` : ""}.`}</div>
+      ${short || RV ? "" : `<div class="small" style="margin-top:8px">Yeni ifadelerin: ${sc.ph.map(p=>`<b lang="en">${esc(p.p)}</b>`).join(" · ")}</div>`}</div>
       ${todaySteps().some(s=>s.k===KEY) ? `<button class="btn primary block" data-snext>Sıradaki adıma geç →</button>` : `<a class="btn primary block" href="#ifade">İfadelerime bak →</a>`}
-      <div class="card"><div class="tiny">İSTERSEN (BİRAZ DAHA KONUŞ)</div>
+      ${RV ? "" : `<div class="card"><div class="tiny">İSTERSEN (BİRAZ DAHA KONUŞ)</div>
       <button class="btn block" data-rp style="margin-top:6px">💬 Bu sahneyi Claude'la canlandır</button>
-      ${mine.length ? `<button class="btn ghost block" data-nat style="margin-top:6px">✨ Kendi cümlelerimi Claude doğallaştırsın</button>` : ""}</div>`;
+      ${mine.length ? `<button class="btn ghost block" data-nat style="margin-top:6px">✨ Kendi cümlelerimi Claude doğallaştırsın</button>` : ""}</div>`}`;
   }
   m.innerHTML = head + dots + body;
   const ta = $("#mine"); if(ta){ ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); ta.oninput = ()=>{ SCN.draft = ta.value; }; }
   const ra = $("#rea"); if(ra && !SCN.res) ra.focus();
-  const redraw = ()=>vScene(m, sub);
+  const redraw = ()=>vScene(m, sub0);
   m.onclick = e=>{
     const pl = e.target.closest("[data-pl]"); if(pl){ const L = sc.l[+pl.dataset.pl]; sayAs(L[1], L[0]); return; }
     const tr = e.target.closest("[data-tr]"); if(tr){ const i = +tr.dataset.tr; SCN.tr[i] = !SCN.tr[i]; redraw(); return; }
@@ -1762,7 +1777,7 @@ function vScene(m, sub){
       x.mine = (x.mine||[]).concat(v).slice(-5); x.n = (x.n||0) + 1; save();
       if(!nrm(v).includes(p.k)) toast(`Güzel! Bir dahakine "${p.p.replace("…","")}" ifadesini de katmayı dene`);
       SCN.draft = null; SCN.said = false;
-      if(SCN.pi+1<sc.ph.length){ SCN.pi++; } else { SCN.re = duePhrases(pace()>=90 ? 4 : 2).filter(id=>!sc.ph.some(p=>p.id===id)); SCN.st = SCN.re.length ? "re" : "end"; if(!SCN.re.length) finishScene(); }
+      if(SCN.pi+1<sc.ph.length){ SCN.pi++; } else { SCN.re = duePhrases(reShare(KEY)).filter(id=>!sc.ph.some(p=>p.id===id)); SCN.st = SCN.re.length ? "re" : "end"; if(!SCN.re.length) finishScene(); }
       redraw(); return; }
     if(e.target.closest("[data-hint]")){ SCN.hint = true; redraw(); return; }
     if(e.target.closest("[data-rmic]")){ listenOnce(t=>{ $("#rea").value = t; }); return; }
@@ -1779,7 +1794,7 @@ function vScene(m, sub){
     if(e.target.closest("[data-nat]")){ const mine = sc.ph.map(p=>(phS()[p.id]||{}).mine).filter(Boolean).map(a=>a.slice(-1)[0]);
       bridge("Cümlelerimi doğallaştır", `Ben A2 seviyesinde, konuşmamı geliştirmek isteyen bir İngilizce öğrencisiyim. Aşağıdaki cümleleri kendi hayatımdan yazdım:\n${mine.map(x=>"- "+x).join("\n")}\n\nHer cümle için: anlaşılıyorsa önce bunu söyle, sonra bir ana dili İngilizce olan kişinin aynı şeyi nasıl söyleyeceğini göster ve farkı Türkçe tek cümleyle açıkla. Kısa ve cesaretlendirici ol.`); return; }
   };
-  function finishScene(){ const d = scS()[sc.id] || {}; scS()[sc.id] = {d: today(), n:(d.n||0)+1, ok: SCN.ok}; logAdd("min", 8); if(todaySteps().some(s=>s.k===KEY && !s.done)) markStep(KEY, true); else save(); }
+  function finishScene(){ if(!RV){ const d = scS()[sc.id] || {}; scS()[sc.id] = {d: today(), n:(d.n||0)+1, ok: SCN.ok}; } logAdd("min", RV ? 4 : 8); if(todaySteps().some(s=>s.k===KEY && !s.done)) markStep(KEY, true); else save(); }
 }
 /* İfadeler tab: the phrase journal (no word lists). Turkish only behind a tap. */
 function vPhr(m){
