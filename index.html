@@ -885,6 +885,17 @@ const Sync = (()=>{
       lsSet(K+"rep", r.id); lsSet(K+"repAt", Date.now()); lsSet(K+"repErr", null); }
     catch(e){ if(id && e && /404/.test(e.message||"")) lsSet(K+"rep", null); else lsSet(K+"repErr", (e && e.message || "").slice(0,3)); }
   }
+  // Weekly note: the app creates the file (drive.file), the weekly agent writes into it, the app shows it on Bugün.
+  async function note(){
+    let id = lsGet(K+"note", null);
+    if(!id){ const fd = new FormData();
+      fd.append("metadata", new Blob([JSON.stringify({name:"ingilizce-defteri-haftalik-not.txt", mimeType:"text/plain"})], {type:"application/json"}));
+      fd.append("file", new Blob(["(henüz not yok)"], {type:"text/plain"}));
+      id = (await (await api("/upload/drive/v3/files?uploadType=multipart&fields=id", {method:"POST", body:fd})).json()).id; lsSet(K+"note", id); return; }
+    let r; try{ r = await api("/drive/v3/files/"+id+"?alt=media"); }catch(e){ if(e && /404/.test(e.message||"")) lsSet(K+"note", null); return; }
+    const txt = (await r.text()).trim();
+    if(txt && txt!=="(henüz not yok)" && txt!==lsGet(K+"noteTxt", "")){ lsSet(K+"noteTxt", txt); lsSet(K+"noteNew", true); const a = document.activeElement; if(location.hash.startsWith("#bugun") && (!a || !/^(INPUT|TEXTAREA)$/.test(a.tagName))) render(); }
+  }
   async function run(){
     if(!on()) return;
     if(!tok()){ setState("auth"); return; }
@@ -901,7 +912,7 @@ const Sync = (()=>{
       if(after !== before){ S = merged; saveLocal(); applyTheme(); const a = document.activeElement; if(!a || !/^(INPUT|TEXTAREA)$/.test(a.tagName)) render(); }
       if(!remote || after !== JSON.stringify(remote) || dirtyFlag){ dirtyFlag = false; await put(JSON.stringify(S), f && f.id); }
       lastAt = Date.now(); setState("ok");
-      report().catch(()=>{});
+      report().catch(()=>{}); note().catch(()=>{});
     }catch(e){
       setState(e && e.code==="auth" ? "auth" : e && e.code==="offline" ? "offline" : "error", e && e.message || "");
     }finally{ busy = false; if(again){ again = false; setTimeout(run, 500); } }
@@ -918,7 +929,8 @@ const Sync = (()=>{
     window.addEventListener("online", run);
   }
   const rep = ()=>({at: lsGet(K+"repAt", 0), err: lsGet(K+"repErr", null)});
-  return {on, connect, disconnect, handleRedirect, run, dirty, start, text, paint, rep};
+  const noteGet = ()=>({txt: lsGet(K+"noteTxt", ""), isNew: !!lsGet(K+"noteNew", false)}), noteSeen = ()=>lsSet(K+"noteNew", false);
+  return {on, connect, disconnect, handleRedirect, run, dirty, start, text, paint, rep, noteGet, noteSeen};
 })();
 
 /* ================= HELPERS ================= */
@@ -2996,6 +3008,9 @@ function vToday(m){
   ${(()=>{ const mo = MOODS.find(x=>x[0]===d.mood), av = AVAIL.find(x=>x[0]===d.avail);
     const body = moodCard() + `<div class="card" style="margin-top:-6px"><div class="small" style="margin-bottom:6px"><b>Bugün ne kadar vaktin var?</b> <span class="tiny">Plan buna göre kısalır ya da uzar.</span></div><div class="row">${AVAIL.map(([n,l])=>`<button class="chip" data-avail="${n}" aria-pressed="${pace()===n}">${l}</button>`).join("")}</div></div>`;
     return (mo || av) && !allDone ? `<details><summary class="small muted" style="margin:0 0 10px;cursor:pointer">${mo?mo[1]:"🙂"} · ${av?av[1]:pace()+" dk"} · <u>değiştir</u></summary>${body}</details>` : allDone ? "" : body; })()}
+  ${(()=>{ const n = Sync.noteGet(); if(!n.txt) return "";
+    return `<details class="card" ${n.isNew ? "open" : ""} data-note><summary style="cursor:pointer"><b>💬 Haftalık notun</b>${n.isNew ? ` <span class="tag acc">yeni</span>` : ""}<div class="tiny">Senin verilerine bakılarak yazıldı</div></summary>
+      <div class="small" style="white-space:pre-wrap;margin-top:8px">${esc(n.txt)}</div>${n.isNew ? `<button class="btn ghost sm" data-noteok style="margin-top:8px">Okudum ✓</button>` : ""}</details>`; })()}
   ${goalHTML()}
   <div class="card" style="border:2px solid var(--accent)"><div class="between"><h3 style="margin:0">📘 Bugünkü planın</h3><span class="tag acc">${allDone?"bitti ✓":`adım ${cur+1}/${steps.length}`}</span></div>
    ${pace()>=45 && !allDone ? `<div class="small" style="margin:8px 0 2px">📕 Kitapların bugün yanında mı? <span class="row" style="display:inline-flex;gap:6px;vertical-align:middle"><button class="chip" data-books="1" aria-pressed="${booksOn()}">Evet</button><button class="chip" data-books="0" aria-pressed="${!booksOn()}">Hayır</button></span>
@@ -3026,6 +3041,7 @@ function vToday(m){
     if(paceClick(e, ()=>vToday(m))) return;
     if(gameClick(e, ()=>vToday(m))) return;
     if(e.target.closest("[data-dice]")){ rollDice(); location.hash = "#oyun"; return; }
+    if(e.target.closest("[data-noteok]")){ Sync.noteSeen(); ev("note", "ok"); vToday(m); return; }
     const bk = e.target.closest("[data-books]"); if(bk){ const v = bk.dataset.books==="1"; fd().books = v; S.settings.books = v; save(); vToday(m); return; }
     const sk = e.target.closest("[data-stick]"); if(sk){ const s = steps.find(x=>x.k===sk.dataset.stick); markStep(s.k, !s.done); if(!s.done) toast("İşaretlendi ✓"); vToday(m); return; }
     if(e.target.closest("[data-flow]") || e.target.closest("[data-step]")){ e.preventDefault(); const i = e.target.closest("[data-step]") ? +e.target.closest("[data-step]").dataset.step : cur; setFlow(true); location.hash = steps[i].href; return; }
