@@ -892,8 +892,10 @@ const Sync = (()=>{
       fd.append("metadata", new Blob([JSON.stringify({name:"ingilizce-defteri-haftalik-not.txt", mimeType:"text/plain"})], {type:"application/json"}));
       fd.append("file", new Blob(["(henüz not yok)"], {type:"text/plain"}));
       id = (await (await api("/upload/drive/v3/files?uploadType=multipart&fields=id", {method:"POST", body:fd})).json()).id; lsSet(K+"note", id); return; }
-    let r; try{ r = await api("/drive/v3/files/"+id+"?alt=media"); }catch(e){ if(e && /404/.test(e.message||"")) lsSet(K+"note", null); return; }
-    const txt = (await r.text()).trim();
+    // the agent's Drive tool can only set metadata, so the note lives in the file's description (body as fallback)
+    let r; try{ r = await api("/drive/v3/files/"+id+"?fields=description"); }catch(e){ if(e && /404/.test(e.message||"")) lsSet(K+"note", null); return; }
+    let txt = ((await r.json()).description || "").trim();
+    if(!txt){ try{ txt = (await (await api("/drive/v3/files/"+id+"?alt=media")).text()).trim(); }catch(e){ return; } }
     if(txt && txt!=="(henüz not yok)" && txt!==lsGet(K+"noteTxt", "")){ lsSet(K+"noteTxt", txt); lsSet(K+"noteNew", true); const a = document.activeElement; if(location.hash.startsWith("#bugun") && (!a || !/^(INPUT|TEXTAREA)$/.test(a.tagName))) render(); }
   }
   async function run(){
