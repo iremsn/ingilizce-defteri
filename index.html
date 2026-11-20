@@ -968,11 +968,21 @@ function pickVoice(){
   VOICE = vs.find(v=>/Google US|Samantha|Aria|Jenny/i.test(v.name)) || vs.find(v=>/en[-_]US/i.test(v.lang)) || vs[0] || null;
 }
 if("speechSynthesis" in window){ pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
+/* iOS/Safari quirks: speak() right after cancel() is silently dropped, an utterance started without a tap can
+   stay "pending" and block the queue, and the engine can be left paused. So: speak at once when idle (inside the tap),
+   otherwise cancel and wait a moment; resume first; and tell the user if nothing starts (silent switch / volume). */
+let SPK = 0;
 function speak(text, slow){
   if(!("speechSynthesis" in window)){ toast("Tarayıcın sesli okumayı desteklemiyor."); return; }
-  speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text); u.lang = VOICE ? VOICE.lang : "en-US"; if(VOICE) u.voice = VOICE;
-  u.rate = slow ? 0.7 : (S.settings.rate || 0.9); speechSynthesis.speak(u);
+  if(!VOICE) pickVoice();
+  const id = ++SPK, go = ()=>{ if(id!==SPK) return;
+    const u = new SpeechSynthesisUtterance(text); u.lang = VOICE ? VOICE.lang : "en-US"; if(VOICE) u.voice = VOICE;
+    u.rate = slow ? 0.7 : (S.settings.rate || 0.9); let started = false; u.onstart = ()=>{ started = true; };
+    u.onerror = e=>{ if(e.error!=="interrupted" && e.error!=="canceled") toast("Ses çalınamadı ("+e.error+"). Tekrar dene."); };
+    try{ speechSynthesis.resume(); }catch(e){}
+    speechSynthesis.speak(u);
+    setTimeout(()=>{ if(id===SPK && !started && !speechSynthesis.speaking){ speechSynthesis.cancel(); toast("Ses gelmedi 🔇 Telefonun sessiz modda olabilir: yandaki sessiz düğmesini kapat ve sesi aç, sonra tekrar bas."); } }, 2500); };
+  if(speechSynthesis.speaking || speechSynthesis.pending){ speechSynthesis.cancel(); setTimeout(go, 150); } else go();
 }
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 const norm = s => s.toLowerCase().replace(/[’']/g,"'").replace(/[^a-z0-9' ]+/g," ").split(/\s+/).filter(Boolean);
@@ -1700,7 +1710,7 @@ function sayAs(text, who, slow, onend){
   const vs = speechSynthesis.getVoices().filter(v=>/^en/i.test(v.lang)), i = {A:0, B:1, C:2}[who] || 0;
   const u = new SpeechSynthesisUtterance(text); u.lang = "en-US"; if(vs.length) u.voice = vs[i % vs.length];
   u.pitch = vs.length>1 ? 1 : [1, 1.25, 0.8][i]; u.rate = slow ? 0.7 : (S.settings.rate || 0.9);
-  if(onend) u.onend = onend; speechSynthesis.speak(u); }
+  if(onend){ u.onend = onend; u.onerror = e=>{ if(e.error!=="interrupted" && e.error!=="canceled") onend(); }; } try{ speechSynthesis.resume(); }catch(e){} speechSynthesis.speak(u); }
 function listenOnce(cb){ if(!SR){ toast("Bu tarayıcı sesi yazıya çeviremiyor; yazarak devam et"); return; }
   const r = new SR(); r.lang = "en-US"; r.interimResults = false; r.onresult = e=>cb(e.results[0][0].transcript); r.onerror = ()=>toast("Duyamadım, bir daha dene ya da yaz"); r.start(); toast("🎙️ Dinliyorum…"); }
 let SCN = null;
@@ -1807,9 +1817,9 @@ function vScene(m, sub){
     const pl = e.target.closest("[data-pl]"); if(pl){ const L = sc.l[+pl.dataset.pl]; sayAs(L[1], L[0]); return; }
     const tr = e.target.closest("[data-tr]"); if(tr){ const i = +tr.dataset.tr; SCN.tr[i] = !SCN.tr[i]; redraw(); return; }
     if(e.target.closest("[data-rv]")){ SCN.show = true; redraw(); return; }
-    if(e.target.closest("[data-play]") || e.target.closest("[data-play-slow]")){ const slow = !!e.target.closest("[data-play-slow]"); speechSynthesis.cancel(); let i = 0;
+    if(e.target.closest("[data-play]") || e.target.closest("[data-play-slow]")){ const slow = !!e.target.closest("[data-play-slow]"), busy = speechSynthesis.speaking || speechSynthesis.pending; speechSynthesis.cancel(); let i = 0;
       const nxt = ()=>{ m.querySelectorAll(".sl").forEach(el=>el.style.background = ""); if(i>=sc.l.length) return; const el = m.querySelector(`.sl[data-li="${i}"]`); if(el) el.style.background = "var(--fill-2)"; const L = sc.l[i++]; sayAs(L[1], L[0], slow, nxt); };
-      nxt(); logAdd("min", 1); return; }
+      if(busy) setTimeout(nxt, 150); else nxt(); logAdd("min", 1); return; }
     if(e.target.closest("[data-show]")){ SCN.show = !SCN.show; redraw(); return; }
     if(e.target.closest("[data-next]")){ speechSynthesis.cancel(); SCN.st = "disc"; SCN.show = false; redraw(); return; }
     const qo = e.target.closest("[data-qo]"); if(qo && SCN.a[SCN.qi]!==0){ const j = +qo.dataset.qo; if(SCN.a[SCN.qi]==null){ if(j===0) SCN.ok++; ev("sq", sc.id+":"+SCN.qi, j===0 ? 1 : -1); } SCN.a[SCN.qi] = j; redraw(); return; }
@@ -2857,7 +2867,7 @@ function buildTest(){
   T_GRAM.forEach(x=>q.push({type:"mc", sec:"grammar", lv:x[0], html:`<div class="qword" style="font-size:24px">${esc(x[1]).replace("___","<u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u>")}</div>`, o:x[2], a:x[3]}));
   q.push({type:"intro", sec:"reading", title:"3 / 6 · Okuma", text:"Kısa metinler okuyup Türkçe soruları cevaplayacaksın. Her şeyi anlaman gerekmiyor; ana fikri yakalamaya çalış."});
   T_READ.forEach(p=>p.qs.forEach(x=>q.push({type:"mc", sec:"reading", lv:p.lv, html:`<div class="passage" lang="en">${esc(p.text)}</div><b>${esc(x[0])}</b>`, o:x[1], a:x[2]})));
-  q.push({type:"intro", sec:"listening", title:"4 / 6 · Dinleme", text:"Bir cümle dinleyeceksin (sesin açık olsun). İstediğin kadar tekrar dinleyebilirsin, ama metni göremezsin."});
+  q.push({type:"intro", sec:"listening", title:"4 / 6 · Dinleme", text:"Her soruda “Cümleyi dinle”ye bas. İstediğin kadar tekrar dinleyebilirsin, ama metni göremezsin. Ses gelmezse: telefonun sesini aç ve yandaki sessiz mod düğmesini kapat (iPhone sessiz modda sesli okumayı da susturur)."});
   T_LIST.forEach(x=>q.push({type:"mc", sec:"listening", lv:x[0], say:x[1], html:`<div class="row" style="margin:6px 0 14px">${playBtn(x[1],"Cümleyi dinle")}</div><b>${esc(x[2])}</b>`, o:x[3], a:x[4]}));
   q.push({type:"self", sec:"writing", title:"5 / 6 · Yazma", text:"Hangilerini yapabileceğini düşünüyorsun? Dürüst ol, kimse görmüyor. Emin değilsen işaretleme."});
   q.push({type:"self", sec:"speaking", title:"6 / 6 · Konuşma", text:"Aynı şekilde: rahatça yapabildiklerini işaretle."});
@@ -2873,7 +2883,6 @@ function vTest(m){
   } else if(it.type==="mc"){
     m.innerHTML = head + `<div lang="en">${it.html}</div><div class="opts">${it.o.map((o,k)=>`<button class="opt" data-k="${k}">${esc(o)}</button>`).join("")}<button class="opt idk" data-k="-1">Bilmiyorum</button></div>
     <p style="text-align:center;margin-top:18px"><button class="btn ghost small" data-skipsec>Bu bölüm bana çok zor geliyor, sonraki bölüme geç</button></p>`;
-    if(it.say) setTimeout(()=>speak(it.say), 350);
   } else {
     const rows = T_SELF[it.sec].map((pair,l)=>pair.map((t,j)=>`<label class="check"><input type="checkbox" data-l="${l}" data-j="${j}"><span>${esc(t)} <span class="tag">${LV[l]}</span></span></label>`).join("")).join("");
     m.innerHTML = head + `<h1>${esc(it.title)}</h1><p class="sub">${esc(it.text)}</p><div class="card" style="padding:4px 18px">${rows}</div><button class="btn primary block" data-selfnext>Devam</button>`;
